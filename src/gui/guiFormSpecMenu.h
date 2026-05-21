@@ -5,6 +5,7 @@
 #pragma once
 
 #include <optional>
+#include <map>
 #include <utility>
 #include <stack>
 #include <unordered_set>
@@ -352,6 +353,7 @@ protected:
 	std::vector<gui::IGUIElement *> m_clickthrough_elements;
 	std::vector<std::pair<std::string, GUIScrollContainer *>> m_scroll_containers;
 	std::vector<std::pair<std::string, GUITerminal *>> m_terminals;
+	std::map<std::string, GUITerminal::TerminalState> m_terminal_saved_states;
 
 	std::unique_ptr<GUIInventoryList::ItemSpec> m_selected_item;
 	u16 m_selected_amount = 0;

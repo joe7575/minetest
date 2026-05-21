@@ -2899,6 +2899,7 @@ void GUIFormSpecMenu::removeAll()
 		scroll_container_it.second->drop();
 	for (auto &terminal_it : m_terminals)
 		terminal_it.second->drop();
+	m_terminals.clear();
 }
 
 const std::unordered_map<std::string, std::function<void(GUIFormSpecMenu*, GUIFormSpecMenu::parserData *data,
@@ -3028,6 +3029,14 @@ void GUIFormSpecMenu::regenerateGui(v2u32 screensize)
 		m_focused_element = std::nullopt;
 	}
 
+	// Save terminal state across regeneration (same formspec, e.g. on resize)
+	if (m_text_dst->m_formname == m_last_formname) {
+		for (auto &pair : m_terminals)
+			m_terminal_saved_states[pair.first] = pair.second->saveState();
+	} else {
+		m_terminal_saved_states.clear();
+	}
+
 	removeAll();
 
 	mydata.size = v2s32(100, 100);
@@ -3053,6 +3062,7 @@ void GUIFormSpecMenu::regenerateGui(v2u32 screensize)
 	m_inventory_rings.clear();
 	m_dropdowns.clear();
 	m_scroll_containers.clear();
+	m_terminals.clear();
 	theme_by_name.clear();
 	theme_by_type.clear();
 	m_clickthrough_elements.clear();
@@ -5357,6 +5367,11 @@ void GUIFormSpecMenu::parseTerminal(parserData *data, const std::string &element
 
 	auto *term = new GUITerminal(Environment, this, spec.fid, rect, cols, rows);
 	term->setNotClipped(true);
+
+	// Restore state if this terminal survived a formspec regeneration (e.g. resize)
+	auto it = m_terminal_saved_states.find(name);
+	if (it != m_terminal_saved_states.end())
+		term->restoreState(it->second);
 
 	m_terminals.emplace_back(name, term);
 	m_fields.push_back(spec);

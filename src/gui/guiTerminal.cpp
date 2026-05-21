@@ -40,6 +40,21 @@ void GUITerminal::setOverrideFont(gui::IGUIFont *font)
 	m_font = font;
 }
 
+GUITerminal::TerminalState GUITerminal::saveState() const
+{
+	return { m_cells, m_cur_col, m_cur_row, m_cur_attr };
+}
+
+void GUITerminal::restoreState(const TerminalState &s)
+{
+	// Restore cells up to the current grid size
+	u32 n = std::min((u32)s.cells.size(), m_cols * m_rows);
+	std::copy(s.cells.begin(), s.cells.begin() + n, m_cells.begin());
+	m_cur_col  = std::min(s.cur_col, m_cols - 1);
+	m_cur_row  = std::min(s.cur_row, m_rows - 1);
+	m_cur_attr = s.cur_attr;
+}
+
 void GUITerminal::reset()
 {
 	std::fill(m_cells.begin(), m_cells.end(), TermCell{});

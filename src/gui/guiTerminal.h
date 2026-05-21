@@ -83,6 +83,15 @@ public:
 	// Reset the terminal (clear screen, home cursor, reset attributes).
 	void reset();
 
+	// Snapshot / restore full terminal state (used to survive formspec regeneration)
+	struct TerminalState {
+		std::vector<TermCell> cells;
+		u32 cur_col, cur_row;
+		TermAttr cur_attr;
+	};
+	TerminalState saveState() const;
+	void restoreState(const TerminalState &s);
+
 	// IGUIElement interface
 	void draw() override;
 	bool OnEvent(const SEvent &event) override { return false; }
