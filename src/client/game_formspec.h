@@ -42,6 +42,7 @@ struct GameFormSpec
 
 	void update();
 	void disableDebugView();
+	void updateTerminalData(const std::string &formname, const std::string &element_name, const std::string &data);
 
 	bool handleCallbacks();
 	void reset();

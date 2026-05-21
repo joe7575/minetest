@@ -2189,6 +2189,7 @@ const ClientEventHandler Game::clientEventHandler[CLIENTEVENT_MAX] = {
 	{&Game::handleClientEvent_OverrideDayNightRatio},
 	{&Game::handleClientEvent_CloudParams},
 	{&Game::handleClientEvent_UpdateCamera},
+	{&Game::handleClientEvent_TerminalData},
 };
 
 void Game::handleClientEvent_None(ClientEvent *event, CameraOrientation *cam)
@@ -3817,4 +3818,13 @@ void the_game(volatile std::sig_atomic_t *kill,
 	}
 
 	game.shutdown();
+}
+
+void Game::handleClientEvent_TerminalData(ClientEvent *event, CameraOrientation *cam)
+{
+	auto &td = event->terminal_data;
+	m_game_formspec.updateTerminalData(*td.formname, *td.element_name, *td.data);
+	delete td.formname;
+	delete td.element_name;
+	delete td.data;
 }

@@ -709,7 +709,16 @@ enum ToClientCommand : u16
 			u8[len] serialized ParticleParameters
 	*/
 
-	TOCLIENT_NUM_MSG_TYPES = 0x65,
+	TOCLIENT_TERMINAL_DATA = 0x65,
+	/*
+		Send VT100 escape sequences to a terminal[] formspec element.
+		The client updates only the named element without reopening the formspec.
+		std::string formname
+		std::string element_name
+		std::string data  (raw bytes, may contain VT100/ANSI sequences)
+	*/
+
+	TOCLIENT_NUM_MSG_TYPES = 0x66,
 };
 
 enum ToServerCommand : u16

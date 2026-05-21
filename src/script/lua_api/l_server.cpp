@@ -409,6 +409,20 @@ int ModApiServer::l_show_formspec(lua_State *L)
 	return 1;
 }
 
+// send_terminal_data(playername, formname, element_name, data)
+int ModApiServer::l_send_terminal_data(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	const char *playername    = luaL_checkstring(L, 1);
+	const char *formname      = luaL_checkstring(L, 2);
+	const char *element_name  = luaL_checkstring(L, 3);
+	size_t data_len;
+	const char *data          = luaL_checklstring(L, 4, &data_len);
+	lua_pushboolean(L, getServer(L)->sendTerminalData(
+		playername, formname, element_name, std::string(data, data_len)));
+	return 1;
+}
+
 // get_current_modname()
 int ModApiServer::l_get_current_modname(lua_State *L)
 {
@@ -700,6 +714,7 @@ void ModApiServer::Initialize(lua_State *L, int top)
 	API_FCT(chat_send_all);
 	API_FCT(chat_send_player);
 	API_FCT(show_formspec);
+	API_FCT(send_terminal_data);
 	API_FCT(sound_play);
 	API_FCT(sound_stop);
 	API_FCT(sound_fade);

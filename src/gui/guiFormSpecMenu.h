@@ -17,6 +17,7 @@
 #include "guiInventoryList.h"
 #include "guiScrollBar.h"
 #include "guiTable.h"
+#include "guiTerminal.h"
 #include "util/string.h"
 #include "StyleSpec.h"
 #include <ICursorControl.h> // gui::ECURSOR_ICON
@@ -275,6 +276,7 @@ public:
 	bool pausesGame() override { return doPause; }
 
 	GUITable* getTable(const std::string &tablename);
+	void updateTerminalData(const std::string &element_name, const std::string &data);
 	std::vector<std::string>* getDropDownValues(const std::string &name);
 
 	// This will only return a meaningful value if called after drawMenu().
@@ -349,6 +351,7 @@ protected:
 	std::vector<std::pair<FieldSpec, std::vector<std::string>>> m_dropdowns;
 	std::vector<gui::IGUIElement *> m_clickthrough_elements;
 	std::vector<std::pair<std::string, GUIScrollContainer *>> m_scroll_containers;
+	std::vector<std::pair<std::string, GUITerminal *>> m_terminals;
 
 	std::unique_ptr<GUIInventoryList::ItemSpec> m_selected_item;
 	u16 m_selected_amount = 0;
@@ -492,6 +495,7 @@ private:
 	void parseStyle(parserData *data, const std::string &element);
 	void parseSetFocus(parserData *, const std::string &element);
 	void parseModel(parserData *data, const std::string &element);
+	void parseTerminal(parserData *data, const std::string &element);
 	void parseAllowClose(parserData *data, const std::string &element);
 
 	bool parseMiddleRect(const std::string &value, core::rect<s32> *parsed_rect);

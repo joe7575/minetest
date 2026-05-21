@@ -13,6 +13,7 @@
 #include "gamedef.h"
 #include "client/keycode.h"
 #include "gui/guiTable.h"
+#include "gui/guiTerminal.h"
 #include <IGUIButton.h>
 #include <IGUICheckBox.h>
 #include <IGUIComboBox.h>
@@ -2896,6 +2897,8 @@ void GUIFormSpecMenu::removeAll()
 		clickthrough_it->drop();
 	for (auto &scroll_container_it : m_scroll_containers)
 		scroll_container_it.second->drop();
+	for (auto &terminal_it : m_terminals)
+		terminal_it.second->drop();
 }
 
 const std::unordered_map<std::string, std::function<void(GUIFormSpecMenu*, GUIFormSpecMenu::parserData *data,
@@ -2946,6 +2949,7 @@ const std::unordered_map<std::string, std::function<void(GUIFormSpecMenu*, GUIFo
 		{"set_focus",              &GUIFormSpecMenu::parseSetFocus},
 		{"model",                  &GUIFormSpecMenu::parseModel},
 		{"allow_close",            &GUIFormSpecMenu::parseAllowClose},
+		{"terminal",               &GUIFormSpecMenu::parseTerminal},
 };
 
 
@@ -5314,4 +5318,57 @@ double GUIFormSpecMenu::calculateImgsize(const parserData &data)
 	// Try to use the preferred imgsize, but if that's bigger than the maximum
 	// size, use the maximum size.
 	return std::min(prefer_imgsize, std::min(fitx_imgsize, fity_imgsize));
+}
+
+// terminal[x,y;w,h;name;cols;rows]
+void GUIFormSpecMenu::parseTerminal(parserData *data, const std::string &element)
+{
+	MY_CHECKCLIENT("terminal");
+
+	std::vector<std::string> parts;
+	if (!precheckElement("terminal", element, 5, 5, parts))
+		return;
+
+	std::vector<std::string> v_pos  = split(parts[0], ',');
+	std::vector<std::string> v_geom = split(parts[1], ',');
+	std::string name = unescape_string(parts[2]);
+	u32 cols = (u32)std::max(1, std::atoi(parts[3].c_str()));
+	u32 rows = (u32)std::max(1, std::atoi(parts[4].c_str()));
+
+	MY_CHECKPOS("terminal", 0);
+	MY_CHECKGEOM("terminal", 1);
+
+	v2s32 pos;
+	v2s32 geom;
+
+	if (data->real_coordinates) {
+		pos  = getRealCoordinateBasePos(v_pos);
+		geom = getRealCoordinateGeometry(v_geom);
+	} else {
+		pos  = getElementBasePos(&v_pos);
+		geom.X = stof(v_geom[0]) * spacing.X;
+		geom.Y = stof(v_geom[1]) * spacing.Y;
+	}
+
+	core::rect<s32> rect(pos, pos + geom);
+
+	FieldSpec spec(name, L"", L"", 258 + m_fields.size(), -2);
+	spec.ftype = f_Unknown; // terminal is not a form field
+
+	auto *term = new GUITerminal(Environment, this, spec.fid, rect, cols, rows);
+	term->setNotClipped(true);
+
+	m_terminals.emplace_back(name, term);
+	m_fields.push_back(spec);
+}
+
+void GUIFormSpecMenu::updateTerminalData(const std::string &element_name,
+	const std::string &data)
+{
+	for (auto &pair : m_terminals) {
+		if (pair.first == element_name) {
+			pair.second->feed(data);
+			return;
+		}
+	}
 }

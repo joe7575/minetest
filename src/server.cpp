@@ -1652,6 +1652,15 @@ void Server::SendShowFormspecMessage(session_t peer_id, const std::string &forms
 	Send(&pkt);
 }
 
+void Server::SendTerminalData(session_t peer_id, const std::string &formname,
+		const std::string &element_name, const std::string &data)
+{
+	NetworkPacket pkt(TOCLIENT_TERMINAL_DATA, 0, peer_id);
+	pkt << formname << element_name;
+	pkt.putLongString(data);
+	Send(&pkt);
+}
+
 void Server::SendSpawnParticles(RemotePlayer *player,
 		const std::vector<ParticleParameters> &particles)
 {
@@ -3520,6 +3529,16 @@ bool Server::showFormspec(const char *playername, const std::string &formspec,
 	player->inventory_formspec_overridden = formname.empty() && !formspec.empty();
 
 	SendShowFormspecMessage(player->getPeerId(), formspec, formname);
+	return true;
+}
+
+bool Server::sendTerminalData(const char *playername, const std::string &formname,
+		const std::string &element_name, const std::string &data)
+{
+	RemotePlayer *player = m_env->getPlayer(playername);
+	if (!player)
+		return false;
+	SendTerminalData(player->getPeerId(), formname, element_name, data);
 	return true;
 }
 

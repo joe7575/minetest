@@ -37,6 +37,7 @@ enum ClientEventType : u8
 	CE_OVERRIDE_DAY_NIGHT_RATIO,
 	CE_CLOUD_PARAMS,
 	CE_UPDATE_CAMERA,
+	CE_TERMINAL_DATA,
 	CLIENTEVENT_MAX,
 };
 
@@ -90,6 +91,12 @@ struct ClientEvent
 			std::string *formspec;
 			std::string *formname;
 		} show_formspec;
+		struct
+		{
+			std::string *formname;
+			std::string *element_name;
+			std::string *data;
+		} terminal_data;
 		ParticleParameters *spawn_particle;
 		struct
 		{

@@ -580,3 +580,14 @@ bool GameFormSpec::handleAndroidUIInput()
 	return false;
 }
 #endif
+
+void GameFormSpec::updateTerminalData(const std::string &formname,
+	const std::string &element_name, const std::string &data)
+{
+	if (!m_formspec)
+		return;
+	// Only update if the currently open formspec matches the target formname
+	if (m_formspec->getName() != formname)
+		return;
+	m_formspec->updateTerminalData(element_name, data);
+}

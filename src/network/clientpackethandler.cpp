@@ -1916,3 +1916,16 @@ void Client::handleCommand_SetLighting(NetworkPacket *pkt)
 		*pkt >> lighting.shadow_direction;
 	} while (0);
 }
+
+void Client::handleCommand_TerminalData(NetworkPacket *pkt)
+{
+	std::string formname, element_name, data;
+	*pkt >> formname >> element_name;
+	data = pkt->readLongString();
+
+	ClientEvent *event = new ClientEvent(CE_TERMINAL_DATA);
+	event->terminal_data.formname     = new std::string(formname);
+	event->terminal_data.element_name = new std::string(element_name);
+	event->terminal_data.data         = new std::string(data);
+	m_client_event_queue.push(event);
+}

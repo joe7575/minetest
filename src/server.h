@@ -366,6 +366,8 @@ public:
 	void addShutdownError(const ModError &e);
 
 	bool showFormspec(const char *name, const std::string &formspec, const std::string &formname);
+	bool sendTerminalData(const char *playername, const std::string &formname,
+			const std::string &element_name, const std::string &data);
 	Map &getMap();
 	ServerEnvironment & getEnv() { return *m_env; }
 	v3f findSpawnPos();
@@ -550,6 +552,8 @@ private:
 	void SendPlayerFormspecPrepend(session_t peer_id);
 	void SendShowFormspecMessage(session_t peer_id, const std::string &formspec,
 		const std::string &formname);
+	void SendTerminalData(session_t peer_id, const std::string &formname,
+		const std::string &element_name, const std::string &data);
 	void SendHUDAdd(session_t peer_id, u32 id, HudElement *form);
 	void SendHUDRemove(session_t peer_id, u32 id);
 	void SendHUDChange(session_t peer_id, u32 id, HudElementStat stat, void *value);
