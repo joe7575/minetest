@@ -8,6 +8,8 @@
 #include <IGUISkin.h>
 #include <IGUIFont.h>
 #include <IVideoDriver.h>
+#include <IEventReceiver.h>
+#include <Keycodes.h>
 #include <algorithm>
 #include <cstring>
 #include "client/fontengine.h"
@@ -365,4 +367,116 @@ void GUITerminal::draw()
 	}
 
 	IGUIElement::draw();
+}
+void GUITerminal::setInputCallback(std::function<void(const std::string &)> cb)
+{
+	m_input_callback = std::move(cb);
+}
+
+// Encode a Unicode codepoint as UTF-8.
+static std::string encode_utf8(wchar_t c)
+{
+	std::string out;
+	u32 cp = (u32)c;
+	if (cp < 0x80) {
+		out += (char)cp;
+	} else if (cp < 0x800) {
+		out += (char)(0xC0 | (cp >> 6));
+		out += (char)(0x80 | (cp & 0x3F));
+	} else if (cp < 0x10000) {
+		out += (char)(0xE0 | (cp >> 12));
+		out += (char)(0x80 | ((cp >> 6) & 0x3F));
+		out += (char)(0x80 | (cp & 0x3F));
+	} else {
+		out += (char)(0xF0 | (cp >> 18));
+		out += (char)(0x80 | ((cp >> 12) & 0x3F));
+		out += (char)(0x80 | ((cp >> 6) & 0x3F));
+		out += (char)(0x80 | (cp & 0x3F));
+	}
+	return out;
+}
+
+bool GUITerminal::OnEvent(const SEvent &event)
+{
+	// On left mouse click: grab keyboard focus so we receive key events.
+	if (event.EventType == EET_MOUSE_INPUT_EVENT) {
+		if (event.MouseInput.Event == EMIE_LMOUSE_PRESSED_DOWN) {
+			if (AbsoluteRect.isPointInside(
+					core::position2di(event.MouseInput.X, event.MouseInput.Y))) {
+				Environment->setFocus(this);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	if (event.EventType != EET_KEY_INPUT_EVENT)
+		return false;
+
+	// Only react when we actually have focus.
+	if (Environment->getFocus() != this)
+		return false;
+
+	if (!event.KeyInput.PressedDown)
+		return false; // ignore key-up events
+
+	if (!m_input_callback)
+		return false;
+
+	std::string data;
+
+	bool ctrl = event.KeyInput.Control;
+
+	// Ctrl+letter → control character (\x01–\x1a)
+	if (ctrl) {
+		EKEY_CODE key = event.KeyInput.Key;
+		if (key >= KEY_KEY_A && key <= KEY_KEY_Z) {
+			char cc = (char)(key - KEY_KEY_A + 1);
+			data = std::string(1, cc);
+			m_input_callback(data);
+			return true;
+		}
+	}
+
+	// Special keys → VT100 sequences
+	switch (event.KeyInput.Key) {
+		case KEY_RETURN:   data = "\r";       break;
+		case KEY_BACK:     data = "\x7f";     break; // DEL (backspace)
+		case KEY_TAB:      data = "\t";       break;
+		case KEY_ESCAPE:   data = "\x1b";     break;
+		case KEY_DELETE:   data = "\x1b[3~";  break;
+		case KEY_HOME:     data = "\x1b[H";   break;
+		case KEY_END:      data = "\x1b[F";   break;
+		case KEY_PRIOR:    data = "\x1b[5~";  break; // Page Up
+		case KEY_NEXT:     data = "\x1b[6~";  break; // Page Down
+		case KEY_UP:       data = "\x1b[A";   break;
+		case KEY_DOWN:     data = "\x1b[B";   break;
+		case KEY_RIGHT:    data = "\x1b[C";   break;
+		case KEY_LEFT:     data = "\x1b[D";   break;
+		case KEY_F1:       data = "\x1bOP";   break;
+		case KEY_F2:       data = "\x1bOQ";   break;
+		case KEY_F3:       data = "\x1bOR";   break;
+		case KEY_F4:       data = "\x1bOS";   break;
+		case KEY_F5:       data = "\x1b[15~"; break;
+		case KEY_F6:       data = "\x1b[17~"; break;
+		case KEY_F7:       data = "\x1b[18~"; break;
+		case KEY_F8:       data = "\x1b[19~"; break;
+		case KEY_F9:       data = "\x1b[20~"; break;
+		case KEY_F10:      data = "\x1b[21~"; break;
+		case KEY_F11:      data = "\x1b[23~"; break;
+		case KEY_F12:      data = "\x1b[24~"; break;
+		default: break;
+	}
+
+	if (data.empty() && event.KeyInput.Char != 0) {
+		// Printable character: encode as UTF-8
+		data = encode_utf8(event.KeyInput.Char);
+	}
+
+	if (!data.empty()) {
+		m_input_callback(data);
+		return true;
+	}
+
+	return false;
 }

@@ -925,7 +925,14 @@ enum ToServerCommand : u16
 		v2f32 max_fs_info
 	*/
 
-	TOSERVER_NUM_MSG_TYPES = 0x54,
+	TOSERVER_TERMINAL_KEY = 0x54,
+	/*
+		std::string formname
+		std::string element_name
+		std::string data   (raw byte(s) to feed into the terminal, e.g. VT100 key)
+	*/
+
+	TOSERVER_NUM_MSG_TYPES = 0x55,
 };
 
 enum AuthMechanism

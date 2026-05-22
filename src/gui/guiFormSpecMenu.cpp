@@ -5368,6 +5368,16 @@ void GUIFormSpecMenu::parseTerminal(parserData *data, const std::string &element
 	auto *term = new GUITerminal(Environment, this, spec.fid, rect, cols, rows);
 	term->setNotClipped(true);
 
+	// Set input callback: sends terminal key events to the server.
+	{
+		std::string formname = m_text_dst->m_formname;
+		std::string elem_name = name;
+		Client *client = m_client;
+		term->setInputCallback([formname, elem_name, client](const std::string &data) {
+			client->sendTerminalKey(formname, elem_name, data);
+		});
+	}
+
 	// Restore state if this terminal survived a formspec regeneration (e.g. resize)
 	auto it = m_terminal_saved_states.find(name);
 	if (it != m_terminal_saved_states.end())

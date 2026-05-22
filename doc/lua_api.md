@@ -3619,6 +3619,35 @@ Elements
         * `span=<value>`: number of following columns to affect
           (default: infinite).
 
+### `terminal[<X>,<Y>;<W>,<H>;<name>;<cols>;<rows>]`
+
+* Displays a VT100/ANSI terminal emulator widget.
+* `name`: element name, used with `core.send_terminal_data()` and
+  `core.register_on_terminal_key()`.
+* `cols`, `rows`: terminal dimensions in characters (e.g. `80`, `24`).
+  Maximum: 240 columns, 60 rows.
+* The terminal renders with a monospace font and a black background.
+* Text is sent from the server with `core.send_terminal_data()`.
+* Keyboard input is received via `core.register_on_terminal_key()`.
+* **Supported VT100/ANSI sequences:**
+    * `\r`, `\n`, `\b`, `\t`
+    * `ESC[A/B/C/D` — cursor up/down/right/left
+    * `ESC[<r>;<c>H` / `ESC[H` — cursor position (1-based)
+    * `ESC[2J` — clear screen and home cursor
+    * `ESC[J` / `ESC[0J` / `ESC[1J` — clear to/from cursor
+    * `ESC[K` / `ESC[0K` / `ESC[1K` / `ESC[2K` — erase line variants
+    * `ESC[m` / `ESC[0m` — reset attributes
+    * `ESC[1m` / `ESC[22m` — bold on/off
+    * `ESC[7m` / `ESC[27m` — reverse video on/off
+    * `ESC[30m`–`ESC[37m` — set foreground color (standard 8 colors)
+    * `ESC[40m`–`ESC[47m` — set background color (standard 8 colors)
+    * `ESC[39m` / `ESC[49m` — default foreground/background
+* Requires `formspec_version[4]` or higher.
+* Not a form field — it does not appear in `on_player_receive_fields`.
+* Click on the terminal widget to give it keyboard focus.
+  While focused, keypresses are sent to the server character by character;
+  special keys are encoded as VT100 sequences (e.g. arrow up → `ESC[A`).
+
 ### `style[<selector 1>,<selector 2>,...;<prop1>;<prop2>;...]`
 
 * Set the style for the element(s) matching `selector` by name.
@@ -6606,6 +6635,26 @@ Call these functions only at load time!
           text field. See also: `field_close_on_enter`.
     * Newest functions are called first
     * If function returns `true`, remaining functions are not called
+* `core.register_on_terminal_key(function(player, formname, element_name, data))`
+    * Called when a player presses a key while a `terminal[]` element is
+      focused (i.e. the player clicked on the terminal widget).
+    * `player`: `ObjectRef` of the player.
+    * `formname`: the formspec name (as passed to `core.show_formspec`).
+    * `element_name`: the `name` parameter of the `terminal[]` element.
+    * `data`: a string containing the raw byte(s) for the key pressed:
+        * Printable characters: the UTF-8 encoded character.
+        * `\r` — Enter
+        * `\x7f` — Backspace (DEL)
+        * `\t` — Tab
+        * `\x1b` — Escape
+        * `\x1b[A` / `B` / `C` / `D` — Arrow keys (up/down/right/left)
+        * `\x1b[3~` — Delete
+        * `\x1b[H` / `\x1b[F` — Home / End
+        * `\x1b[5~` / `\x1b[6~` — Page Up / Page Down
+        * `\x1bOP`–`\x1bOS` — F1–F4
+        * `\x1b[15~`–`\x1b[24~` — F5–F12
+        * `\x01`–`\x1a` — Ctrl+A through Ctrl+Z
+    * Callbacks are called in registration order.
 * `core.register_on_craft(function(itemstack, player, old_craft_grid, craft_inv))`
     * Called when `player` crafts something
     * `itemstack` is the output
@@ -7239,6 +7288,14 @@ Formspec functions
             * Supported if server AND client are both of version >= 5.13.0.
     * `formspec`: formspec to display
     * See also: `core.register_on_player_receive_fields`
+* `core.send_terminal_data(playername, formname, element_name, data)`
+    * Sends raw bytes to a `terminal[]` element in an open formspec.
+    * `playername`: name of the target player.
+    * `formname`: name passed to `core.show_formspec`.
+    * `element_name`: the `name` parameter of the `terminal[]` element.
+    * `data`: a string of raw bytes, which may contain VT100/ANSI escape
+      sequences. The terminal emulator processes them and updates its display.
+    * Has no effect if the player does not have that formspec open.
 * `core.close_formspec(playername, formname)`
     * `playername`: name of player to close formspec
     * `formname`: has to exactly match the one given in `show_formspec`, or the

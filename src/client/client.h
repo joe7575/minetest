@@ -226,6 +226,8 @@ public:
 		const StringMap &fields);
 	void sendInventoryFields(const std::string &formname,
 		const StringMap &fields);
+	void sendTerminalKey(const std::string &formname,
+		const std::string &element_name, const std::string &data);
 	void sendInventoryAction(InventoryAction *a);
 	void sendChatMessage(const std::wstring &message);
 	void clearOutChatQueue();

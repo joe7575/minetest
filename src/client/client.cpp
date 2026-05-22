@@ -1354,6 +1354,15 @@ void Client::sendInventoryFields(const std::string &formname,
 	Send(&pkt);
 }
 
+void Client::sendTerminalKey(const std::string &formname,
+		const std::string &element_name, const std::string &data)
+{
+	NetworkPacket pkt(TOSERVER_TERMINAL_KEY, 0);
+	pkt << formname << element_name;
+	pkt.putLongString(data);
+	Send(&pkt);
+}
+
 void Client::sendInventoryAction(InventoryAction *a)
 {
 	std::ostringstream os(std::ios_base::binary);

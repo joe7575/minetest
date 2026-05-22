@@ -37,6 +37,9 @@ public:
 			const PlayerHPChangeReason &reason);
 	void on_playerReceiveFields(ServerActiveObject *player,
 			const std::string &formname, const StringMap &fields);
+	void on_terminal_key(ServerActiveObject *player,
+			const std::string &formname, const std::string &element_name,
+			const std::string &data);
 	void on_authplayer(const std::string &name, const std::string &ip, bool is_success);
 
 	// Player inventory callbacks

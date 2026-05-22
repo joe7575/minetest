@@ -8,6 +8,7 @@
 #include <SColor.h>
 #include <string>
 #include <vector>
+#include <functional>
 
 namespace gui { class IGUIFont; }
 
@@ -94,11 +95,16 @@ public:
 
 	// IGUIElement interface
 	void draw() override;
-	bool OnEvent(const SEvent &event) override { return false; }
+	bool OnEvent(const SEvent &event) override;
+
+	// Set callback that is invoked with raw key data whenever a key is pressed.
+	// The data is already encoded as a VT100/UTF-8 byte string.
+	void setInputCallback(std::function<void(const std::string &)> cb);
 
 	void setOverrideFont(gui::IGUIFont *font);
 
 private:
+	std::function<void(const std::string &)> m_input_callback;
 	u32 m_cols;
 	u32 m_rows;
 	u32 m_cur_col = 0;   // 0-based
