@@ -724,7 +724,42 @@ enum ToClientCommand : u16
 		[protocol version 53]
 	*/
 
-	TOCLIENT_NUM_MSG_TYPES = 0x66,
+	TOCLIENT_TERMINAL_INIT = 0x66,
+	/*
+		Send a full terminal[] grid state to a freshly-attached client.
+		Used for raw / raw_color terminals whose canonical state lives on
+		the server, so a client that opens the form later (or reconnects)
+		can be brought up to date.
+		std::string formname
+		std::string element_name
+		u8 type (0 = vt100, 1 = raw, 2 = raw_color)
+		u16 cols
+		u16 rows
+		u32 version
+		u32 cell_data_size  (size of the cell payload in bytes)
+		u8[cell_data_size] cell_data
+		  For raw:     one u32 (little-endian) per cell, the Unicode codepoint
+		  For raw_color: one u32 + u8 fg + u8 bg per cell
+		[protocol version 54]
+	*/
+
+	TOCLIENT_TERMINAL_DIFF = 0x67,
+	/*
+		Send a list of changed cells for a terminal[] element. Cheaper than
+		re-sending the full grid. Each entry is:
+			u16 cell_index
+			u8  cell_size
+			u8[cell_size] cell_bytes
+		Followed by:
+		u32 from_version
+		u32 to_version
+		std::string formname
+		std::string element_name
+		then a u16 num_changes, then the entries above.
+		[protocol version 54]
+	*/
+
+	TOCLIENT_NUM_MSG_TYPES = 0x68,
 };
 
 enum ToServerCommand : u16

@@ -2190,6 +2190,8 @@ const ClientEventHandler Game::clientEventHandler[CLIENTEVENT_MAX] = {
 	{&Game::handleClientEvent_CloudParams},
 	{&Game::handleClientEvent_UpdateCamera},
 	{&Game::handleClientEvent_TerminalData},
+	{&Game::handleClientEvent_TerminalInit},
+	{&Game::handleClientEvent_TerminalDiff},
 };
 
 void Game::handleClientEvent_None(ClientEvent *event, CameraOrientation *cam)
@@ -3827,4 +3829,24 @@ void Game::handleClientEvent_TerminalData(ClientEvent *event, CameraOrientation 
 	delete td.formname;
 	delete td.element_name;
 	delete td.data;
+}
+
+void Game::handleClientEvent_TerminalInit(ClientEvent *event, CameraOrientation *cam)
+{
+	auto &ti = event->terminal_init;
+	m_game_formspec.initTerminalBuffer(*ti.formname, *ti.element_name,
+		ti.type, ti.cols, ti.rows, ti.version, *ti.cell_data);
+	delete ti.formname;
+	delete ti.element_name;
+	delete ti.cell_data;
+}
+
+void Game::handleClientEvent_TerminalDiff(ClientEvent *event, CameraOrientation *cam)
+{
+	auto &td = event->terminal_diff;
+	m_game_formspec.applyTerminalDiff(*td.formname, *td.element_name,
+		td.from_version, td.to_version, *td.cell_data);
+	delete td.formname;
+	delete td.element_name;
+	delete td.cell_data;
 }

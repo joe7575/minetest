@@ -488,6 +488,7 @@ set(common_SRCS
 	server.cpp
 	serverenvironment.cpp
 	servermap.cpp
+	serverterminal.cpp
 	translation.cpp
 	version.cpp
 	voxel.cpp

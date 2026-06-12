@@ -710,6 +710,9 @@ void Server::AsyncRunStep(float dtime, bool initial_step)
 		m_timeofday_gauge->set(time);
 	}
 
+	// Flush server-side terminal[] buffers to attached clients.
+	flushTerminalBuffers(dtime);
+
 	{
 		EnvAutoLock lock(this);
 		float max_lag = m_env->getMaxLagEstimate();
@@ -1658,6 +1661,43 @@ void Server::SendTerminalData(session_t peer_id, const std::string &formname,
 	NetworkPacket pkt(TOCLIENT_TERMINAL_DATA, 0, peer_id);
 	pkt << formname << element_name;
 	pkt.putLongString(data);
+	Send(&pkt);
+}
+
+void Server::SendTerminalInit(session_t peer_id, const std::string &formname,
+	const std::string &element_name, const ServerTerminalBuffer &buf)
+{
+	std::string cell_data;
+	buf.serializeAll(cell_data);
+	if (cell_data.size() > TERMINAL_MAX_DATA_LEN) {
+		warningstream << "Server::SendTerminalInit: payload "
+			<< cell_data.size() << " exceeds cap, dropping" << std::endl;
+		return;
+	}
+	NetworkPacket pkt(TOCLIENT_TERMINAL_INIT, 0, peer_id);
+	pkt << formname << element_name;
+	pkt << (u8)buf.getType();
+	pkt << (u16)buf.getCols() << (u16)buf.getRows();
+	pkt << (u32)buf.getVersion();
+	pkt << (u32)cell_data.size();
+	pkt.putRawString(cell_data);
+	Send(&pkt);
+}
+
+void Server::SendTerminalDiff(session_t peer_id, const std::string &formname,
+	const std::string &element_name, const ServerTerminalBuffer &buf,
+	u32 from_version, const std::string &payload)
+{
+	if (payload.size() > TERMINAL_MAX_DATA_LEN) {
+		warningstream << "Server::SendTerminalDiff: payload "
+			<< payload.size() << " exceeds cap, dropping" << std::endl;
+		return;
+	}
+	NetworkPacket pkt(TOCLIENT_TERMINAL_DIFF, 0, peer_id);
+	pkt << formname << element_name;
+	pkt << (u32)from_version;
+	pkt << (u32)buf.getVersion();
+	pkt.putRawString(payload); // serialized list of changed cells
 	Send(&pkt);
 }
 
@@ -3179,6 +3219,7 @@ void Server::DeleteClient(session_t peer_id, ClientDeletionReason reason)
 		}
 		{
 			EnvAutoLock envlock(this);
+			m_terminal_buffers.forgetPeer(peer_id);
 			m_clients.DeleteClient(peer_id);
 		}
 	}
@@ -3528,8 +3569,160 @@ bool Server::showFormspec(const char *playername, const std::string &formspec,
 	// To allow re-sending the same inventory formspec.
 	player->inventory_formspec_overridden = formname.empty() && !formspec.empty();
 
+	// If the server is closing a formspec, drop all server-side terminal
+	// buffers that belong to it.
+	if (formspec.empty() && !formname.empty())
+		m_terminal_buffers.destroyAllForFormspec(formname);
+
+	// If a (re)show is happening, create or resize any raw/raw_color
+	// terminal[] buffers that the new formspec declares. We do this
+	// before sending TOCLIENT_SHOW_FORMSPEC so that the first flush
+	// already has a stable buffer to diff against.
+	if (!formspec.empty())
+		scanFormspecForTerminals(formspec, formname);
+
 	SendShowFormspecMessage(player->getPeerId(), formspec, formname);
 	return true;
+}
+
+void Server::flushTerminalBuffers(float dtime)
+{
+	static const float interval = 0.2f; // 200 ms
+	m_terminal_send_timer -= dtime;
+	if (m_terminal_send_timer > 0)
+		return;
+	m_terminal_send_timer = interval;
+
+	// Walk every live buffer and decide, per-peer, whether to send
+	// INIT (peer has never seen this buffer) or DIFF (peer is behind).
+	// A peer is "interested" in a buffer if the buffer's formname
+	// matches the formname currently open on that peer.
+	auto peer_ids = m_clients.getClientIDs(CS_Active);
+	m_terminal_buffers.forEachBuffer([this, &peer_ids](
+			const std::string &key, ServerTerminalBuffer &buf) {
+		std::string formname, element_name;
+		if (!ServerTerminalStore::splitKey(key, formname, element_name))
+			return;
+		for (session_t peer_id : peer_ids) {
+			// Only send to clients on the new protocol.
+			if (m_clients.getProtocolVersion(peer_id) < 54)
+				continue;
+			// Only send to peers that are actually looking at this
+			// formspec right now.
+			auto fit = m_formspec_state_data.find(peer_id);
+			if (fit == m_formspec_state_data.end() ||
+					fit->second != formname)
+				continue;
+			u32 peer_version = m_terminal_buffers.getPeerVersion(
+				formname, element_name, peer_id);
+			if (peer_version == 0) {
+				// First attach for this peer.
+				SendTerminalInit(peer_id, formname, element_name, buf);
+				m_terminal_buffers.setPeerVersion(formname,
+					element_name, peer_id, buf.getVersion());
+			} else if (peer_version < buf.getVersion()) {
+				// Send a diff of cells changed since peer_version.
+				std::string payload;
+				u32 n = buf.serializeChangedSince(peer_version, payload);
+				if (n > 0) {
+					SendTerminalDiff(peer_id, formname, element_name,
+						buf, peer_version, payload);
+				}
+				// Whether or not there were dirty cells (the buffer
+				// may have been bumped by clear() with no observed
+				// diff for this peer in the simple model), advance
+				// the peer's version so we don't resend stale data.
+				m_terminal_buffers.setPeerVersion(formname,
+					element_name, peer_id, buf.getVersion());
+			}
+		}
+	});
+}
+
+void Server::scanFormspecForTerminals(const std::string &formspec,
+	const std::string &formname)
+{
+	// The formspec string is a sequence of "fieldname[args]" elements
+	// separated by whitespace. We only care about terminal[] with a
+	// non-default type. The full grammar is parsed by the client-side
+	// GUIFormSpecMenu, but a small subset is enough here.
+	size_t pos = 0;
+	while (pos < formspec.size()) {
+		// skip whitespace and field separators
+		while (pos < formspec.size() &&
+				(formspec[pos] == ' ' || formspec[pos] == '\t' ||
+				 formspec[pos] == '\n' || formspec[pos] == '\r'))
+			pos++;
+		if (pos >= formspec.size())
+			break;
+
+		// Match "terminal[" prefix (case-sensitive, matches the parser)
+		static const std::string prefix = "terminal[";
+		if (formspec.compare(pos, prefix.size(), prefix) != 0) {
+			// Not a terminal element; skip to the next ']' (best effort)
+			auto close = formspec.find(']', pos);
+			if (close == std::string::npos)
+				break;
+			pos = close + 1;
+			continue;
+		}
+		pos += prefix.size();
+
+		// Parse until the matching ']'. Formspec args may contain '['
+		// (e.g. coordinates) but the top-level brackets balance; we
+		// look for the first ']' at bracket depth 0.
+		int depth = 1;
+		size_t end = pos;
+		while (end < formspec.size() && depth > 0) {
+			if (formspec[end] == '[') depth++;
+			else if (formspec[end] == ']') depth--;
+			if (depth == 0) break;
+			end++;
+		}
+		if (depth != 0)
+			break; // malformed; bail
+
+		std::string args = formspec.substr(pos, end - pos);
+		pos = end + 1;
+
+		// Split args by ';': [X,Y] [W,H] [name] [cols,rows or cols] [rows or type] [type?]
+		auto parts = split(args, ';');
+		if (parts.size() < 4)
+			continue;
+
+		std::string name = unescape_string(parts[2]);
+		int cols, rows;
+		TerminalType type = TERMINAL_TYPE_VT100;
+		if (parts.size() >= 6) {
+			// New grammar: parts[3] = "cols,rows", parts[5] = type
+			auto dim_parts = split(parts[3], ',');
+			if (dim_parts.size() < 2)
+				continue;
+			cols = std::atoi(std::string(trim(dim_parts[0])).c_str());
+			rows = std::atoi(std::string(trim(dim_parts[1])).c_str());
+			std::string t(trim(parts[5]));
+			if (t == "raw")            type = TERMINAL_TYPE_RAW;
+			else if (t == "raw_color") type = TERMINAL_TYPE_RAW_COLOR;
+		} else {
+			// Legacy grammar: parts[3] = cols, parts[4] = rows, no type
+			cols = std::atoi(std::string(trim(parts[3])).c_str());
+			rows = std::atoi(std::string(trim(parts[4])).c_str());
+		}
+		if (cols <= 0 || rows <= 0)
+			continue;
+		// Clamp to the client-side limit so server and client agree.
+		if (cols > 240) cols = 240;
+		if (rows > 60) rows = 60;
+		if (type == TERMINAL_TYPE_VT100) {
+			// Nothing to do for VT100; the client emulates the grid
+			// and there's no server-side state to keep.
+			continue;
+		}
+
+		m_terminal_buffers.getOrCreate(type,
+			static_cast<u16>(cols), static_cast<u16>(rows),
+			formname, name);
+	}
 }
 
 bool Server::sendTerminalData(const char *playername, const std::string &formname,
@@ -3545,6 +3738,81 @@ bool Server::sendTerminalData(const char *playername, const std::string &formnam
 		return false;
 	}
 	SendTerminalData(player->getPeerId(), formname, element_name, data);
+	return true;
+}
+
+bool Server::terminalSetCell(const std::string &formname,
+	const std::string &element_name, u16 col, u16 row,
+	const std::string &char_str, u8 fg, u8 bg)
+{
+	ServerTerminalBuffer *buf = m_terminal_buffers.find(formname, element_name);
+	if (!buf) {
+		// Lazy-create with default 80x25 raw, so that simple mods work
+		// even before the first show_formspec has been processed. Most
+		// mods will trigger this implicitly via show_formspec; the
+		// fall-back keeps accidental "fire and forget" writes from
+		// silently being dropped.
+		buf = &m_terminal_buffers.getOrCreate(TERMINAL_TYPE_RAW, 80, 25,
+			formname, element_name);
+	}
+	if (buf->getType() == TERMINAL_TYPE_VT100) {
+		warningstream << "Server::terminalSetCell: buffer for "
+			<< formname << "/" << element_name
+			<< " is VT100; setCell has no effect" << std::endl;
+		return false;
+	}
+	// Decode UTF-8 to a single codepoint; only the first character is used.
+	wchar_t ch = L' ';
+	if (!char_str.empty()) {
+		const u8 *p = reinterpret_cast<const u8*>(char_str.data());
+		size_t avail = char_str.size();
+		if (!(p[0] & 0x80)) {
+			ch = (wchar_t)p[0];
+		} else {
+			int len = 0;
+			u32 cp = 0;
+			if ((p[0] & 0xE0) == 0xC0) { len = 2; cp = p[0] & 0x1F; }
+			else if ((p[0] & 0xF0) == 0xE0) { len = 3; cp = p[0] & 0x0F; }
+			else if ((p[0] & 0xF8) == 0xF0) { len = 4; cp = p[0] & 0x07; }
+			else return false; // invalid lead byte
+			if ((size_t)len > avail)
+				return false;
+			for (int i = 1; i < len; i++) {
+				if ((p[i] & 0xC0) != 0x80)
+					return false;
+				cp = (cp << 6) | (p[i] & 0x3F);
+			}
+			ch = (wchar_t)cp;
+		}
+	}
+	buf->setCell(col, row, ch, fg, bg);
+	return true;
+}
+
+bool Server::terminalClear(const std::string &formname,
+	const std::string &element_name)
+{
+	ServerTerminalBuffer *buf = m_terminal_buffers.find(formname, element_name);
+	if (!buf)
+		return false;
+	if (buf->getType() == TERMINAL_TYPE_VT100) {
+		warningstream << "Server::terminalClear: buffer for "
+			<< formname << "/" << element_name
+			<< " is VT100; clear has no effect" << std::endl;
+		return false;
+	}
+	buf->clear();
+	return true;
+}
+
+bool Server::terminalGetSize(const std::string &formname,
+	const std::string &element_name, u16 &cols, u16 &rows) const
+{
+	const ServerTerminalBuffer *buf = m_terminal_buffers.find(formname, element_name);
+	if (!buf)
+		return false;
+	cols = buf->getCols();
+	rows = buf->getRows();
 	return true;
 }
 

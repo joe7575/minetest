@@ -3009,6 +3009,13 @@ Version History
   * label[]: Add "area label" variant
 * Formspec version 10 (5.13.0)
   * model[]: Support floating-point frames
+* Formspec version 11 (5.17.0)
+  * Added `terminal[]` element (vt100 type, with raw/raw_color in 5.18.0)
+  * Added `core.send_terminal_data()`, `core.register_on_terminal_key()`
+* Formspec version 12 (5.18.0)
+  * terminal[]: added `type` field; `raw` and `raw_color` variants
+  * Added `core.terminal_set_cell()`, `core.terminal_clear()`,
+    `core.terminal_get_size()`
 
 Elements
 --------
@@ -3619,17 +3626,25 @@ Elements
         * `span=<value>`: number of following columns to affect
           (default: infinite).
 
-### `terminal[<X>,<Y>;<W>,<H>;<name>;<cols>;<rows>]`
+### `terminal[<X>,<Y>;<W>,<H>;<name>;<cols>,<rows>;<type>]`
 
-* Displays a VT100/ANSI terminal emulator widget.
-* `name`: element name, used with `core.send_terminal_data()` and
-  `core.register_on_terminal_key()`.
-* `cols`, `rows`: terminal dimensions in characters (e.g. `80`, `24`).
+* Displays a terminal widget. The semantics depend on `type`:
+  * `type` is omitted or `"vt100"` (default): a VT100/ANSI terminal emulator
+    that receives escape sequences from `core.send_terminal_data()` and
+    forwards keyboard input to `core.register_on_terminal_key()`.
+  * `"raw"`: a server-driven character grid. Each cell is a single Unicode
+    codepoint. Mods write cells with `core.terminal_set_cell()` and clear
+    with `core.terminal_clear()`. The server buffers the grid and pushes a
+    full state to a client the first time it opens the form; subsequent
+    changes are streamed as 200 ms diffs. Useful for emulating simple
+    memory-mapped displays (PDP-8, etc.).
+  * `"raw_color"`: like `"raw"` but each cell also carries an 8-color
+    foreground and background (C64-style).
+* `name`: element name.
+* `cols`, `rows`: terminal dimensions in characters (e.g. `80,24`).
   Maximum: 240 columns, 60 rows.
 * The terminal renders with a monospace font and a black background.
-* Text is sent from the server with `core.send_terminal_data()`.
-* Keyboard input is received via `core.register_on_terminal_key()`.
-* **Supported VT100/ANSI sequences:**
+* **VT100 sequences** (only when `type="vt100"`):
     * `\r`, `\n`, `\b`, `\t`
     * `ESC[A/B/C/D` — cursor up/down/right/left
     * `ESC[<r>;<c>H` / `ESC[H` — cursor position (1-based)
@@ -3642,13 +3657,12 @@ Elements
     * `ESC[30m`–`ESC[37m` — set foreground color (standard 8 colors)
     * `ESC[40m`–`ESC[47m` — set background color (standard 8 colors)
     * `ESC[39m` / `ESC[49m` — default foreground/background
-* Requires `formspec_version[10]` or higher (the element was added together
-  with the current formspec API version; older formspecs will log a warning
-  and skip the element).
+* Requires `formspec_version[10]` or higher.
 * Not a form field — it does not appear in `on_player_receive_fields`.
 * Click on the terminal widget to give it keyboard focus.
   While focused, keypresses are sent to the server character by character;
   special keys are encoded as VT100 sequences (e.g. arrow up → `ESC[A`).
+  Key input is forwarded for both `vt100` and `raw` / `raw_color` types.
 
 ### `style[<selector 1>,<selector 2>,...;<prop1>;<prop2>;...]`
 
@@ -7298,6 +7312,22 @@ Formspec functions
     * `data`: a string of raw bytes, which may contain VT100/ANSI escape
       sequences. The terminal emulator processes them and updates its display.
     * Has no effect if the player does not have that formspec open.
+* `core.terminal_set_cell(formname, element_name, col, row, char [, fg, bg])`
+    * Sets a single cell of a server-side `terminal[<...>;"raw" or "raw_color"]`
+      buffer. Has no effect on `vt100` terminals.
+    * `formname`, `element_name`: identify the terminal element.
+    * `col`, `row`: 0-based cell coordinates.
+    * `char`: a single-character UTF-8 string. Only the first character is used.
+    * `fg`, `bg`: optional 0-7 color indices (only used for `raw_color`).
+    * Returns `true` on success, `false` if the buffer does not exist or
+      the coordinates are out of range.
+* `core.terminal_clear(formname, element_name)`
+    * Resets every cell of a server-side `terminal[<...>;"raw" or "raw_color"]`
+      buffer to a space with default colors. Has no effect on `vt100` terminals.
+    * Returns `true` on success, `false` if the buffer does not exist.
+* `core.terminal_get_size(formname, element_name)`
+    * Returns `cols, rows` for a server-side terminal buffer, or `nil` if
+      no such buffer exists.
 * `core.close_formspec(playername, formname)`
     * `playername`: name of player to close formspec
     * `formname`: has to exactly match the one given in `show_formspec`, or the

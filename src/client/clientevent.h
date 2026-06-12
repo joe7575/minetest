@@ -38,6 +38,8 @@ enum ClientEventType : u8
 	CE_CLOUD_PARAMS,
 	CE_UPDATE_CAMERA,
 	CE_TERMINAL_DATA,
+	CE_TERMINAL_INIT,
+	CE_TERMINAL_DIFF,
 	CLIENTEVENT_MAX,
 };
 
@@ -97,6 +99,22 @@ struct ClientEvent
 			std::string *element_name;
 			std::string *data;
 		} terminal_data;
+		struct
+		{
+			std::string *formname;
+			std::string *element_name;
+			u8 type;
+			u16 cols, rows;
+			u32 version;
+			std::string *cell_data;
+		} terminal_init;
+		struct
+		{
+			std::string *formname;
+			std::string *element_name;
+			u32 from_version, to_version;
+			std::string *cell_data;
+		} terminal_diff;
 		ParticleParameters *spawn_particle;
 		struct
 		{

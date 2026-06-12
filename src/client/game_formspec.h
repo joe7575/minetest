@@ -42,7 +42,14 @@ struct GameFormSpec
 
 	void update();
 	void disableDebugView();
-	void updateTerminalData(const std::string &formname, const std::string &element_name, const std::string &data);
+	void updateTerminalData(const std::string &formname,
+		const std::string &element_name, const std::string &data);
+	void initTerminalBuffer(const std::string &formname,
+		const std::string &element_name, u8 type, u16 cols, u16 rows,
+		u32 version, const std::string &cell_data);
+	void applyTerminalDiff(const std::string &formname,
+		const std::string &element_name, u32 from_version, u32 to_version,
+		const std::string &cell_data);
 
 	bool handleCallbacks();
 	void reset();

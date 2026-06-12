@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cstring>
 #include "client/fontengine.h"
+#include "log.h"
 
 // Standard VT100/ANSI 8-color palette (dark variants)
 const video::SColor GUITerminal::s_palette[8] = {
@@ -65,6 +66,88 @@ void GUITerminal::reset()
 	m_cur_attr = TermAttr{};
 	m_parse_state = ParseState::NORMAL;
 	m_csi_params.clear();
+}
+
+void GUITerminal::initFromServer(u8 type, u16 cols, u16 rows,
+	const std::string &cell_data)
+{
+	// Only "raw" and "raw_color" cells are server-driven. For VT100 we
+	// keep the client-side state and ignore the packet -- it might be a
+	// stale init that arrived after the form was closed.
+	if (type == 0)
+		return;
+	// Resize the grid if the server says so. This will only ever shrink
+	// or expand; the client clamps to TERMINAL_MAX_COLS / ROWS in the
+	// constructor, so a server that asks for more gets capped here too.
+	u32 want_cols = std::min((u32)cols, (u32)TERMINAL_MAX_COLS);
+	u32 want_rows = std::min((u32)rows, (u32)TERMINAL_MAX_ROWS);
+	if (want_cols != m_cols || want_rows != m_rows) {
+		m_cols = want_cols;
+		m_rows = want_rows;
+		m_cells.assign(m_cols * m_rows, TermCell{});
+	} else {
+		std::fill(m_cells.begin(), m_cells.end(), TermCell{});
+	}
+	u8 cell_size = (type == 2) ? 6 : 4; // raw_color: 6, raw: 4
+	u32 cell_count = m_cols * m_rows;
+	if (cell_data.size() < cell_count * cell_size) {
+		// Truncated; keep what we got and zero the rest.
+		infostream << "GUITerminal::initFromServer: cell_data size "
+			<< cell_data.size() << " < expected " << cell_count * cell_size
+			<< " for " << cell_count << " cells of " << (int)cell_size
+			<< " bytes" << std::endl;
+		cell_count = cell_data.size() / cell_size;
+	}
+	for (u32 i = 0; i < cell_count; i++) {
+		const u8 *p = reinterpret_cast<const u8*>(
+			cell_data.data() + i * cell_size);
+		u32 cp = (u32)p[0] | ((u32)p[1] << 8)
+			| ((u32)p[2] << 16) | ((u32)p[3] << 24);
+		auto &c = m_cells[i];
+		c.ch = (wchar_t)cp;
+		c.attr = TermAttr{};
+		if (type == 2) {
+			c.attr.fg = p[4];
+			c.attr.bg = p[5];
+		}
+	}
+	// Cursor is meaningless for raw buffers; pin it to home.
+	m_cur_col = 0;
+	m_cur_row = 0;
+	m_cur_attr = TermAttr{};
+	// Cancel any in-flight VT100 parse state.
+	m_parse_state = ParseState::NORMAL;
+	m_csi_params.clear();
+}
+
+void GUITerminal::applyServerDiff(const std::string &cell_data)
+{
+	// Wire format: repeated (u16 idx, u8 cell_size, cell_bytes[cell_size])
+	u32 i = 0;
+	while (i + 3 <= cell_data.size()) {
+		const u8 *p = reinterpret_cast<const u8*>(cell_data.data() + i);
+		u16 idx = (u16)p[0] | ((u16)p[1] << 8);
+		u8  cell_size = p[2];
+		i += 3;
+		if (i + cell_size > cell_data.size())
+			break;
+		if (idx >= m_cells.size() || cell_size < 4 || cell_size > 6) {
+			i += cell_size;
+			continue;
+		}
+		auto &c = m_cells[idx];
+		const u8 *q = reinterpret_cast<const u8*>(cell_data.data() + i);
+		u32 cp = (u32)q[0] | ((u32)q[1] << 8)
+			| ((u32)q[2] << 16) | ((u32)q[3] << 24);
+		c.ch = (wchar_t)cp;
+		if (cell_size >= 6) {
+			c.attr.fg = q[4];
+			c.attr.bg = q[5];
+		} else {
+			c.attr = TermAttr{};
+		}
+		i += cell_size;
+	}
 }
 
 // ---------------------------------------------------------------------------

@@ -82,10 +82,16 @@
 		Added TOCLIENT_TERMINAL_DATA
 		Added TOSERVER_TERMINAL_KEY
 		Added `terminal[]` formspec element with built-in VT100/ANSI emulator
+	PROTOCOL VERSION 54
+		Added TOCLIENT_TERMINAL_INIT
+		Added TOCLIENT_TERMINAL_DIFF
+		Added `raw` / `raw_color` terminal[] variants with server-side
+		buffer model (cells stored on server, INIT sent on first attach,
+		DIFF flushed every ~200ms)
 */
 
 // Note: Also update core.protocol_versions in builtin when bumping
-const u16 LATEST_PROTOCOL_VERSION = 53;
+const u16 LATEST_PROTOCOL_VERSION = 54;
 
 // See also formspec [Version History] in doc/lua_api.md
-const u16 FORMSPEC_API_VERSION = 10;
+const u16 FORMSPEC_API_VERSION = 12;

@@ -84,6 +84,21 @@ public:
 	// Reset the terminal (clear screen, home cursor, reset attributes).
 	void reset();
 
+	// Initialize the grid from a server-pushed full state. Used for
+	// type="raw" / type="raw_color" terminals; VT100 terminals ignore
+	// these calls (the server is not authoritative for them).
+	// `cell_data` is the wire-format payload from TOCLIENT_TERMINAL_INIT:
+	// for raw, one u32 little-endian codepoint per cell; for raw_color,
+	// u32 + u8 fg + u8 bg per cell. The size must equal cols*rows*cellSize.
+	void initFromServer(u8 type, u16 cols, u16 rows,
+		const std::string &cell_data);
+
+	// Apply a list of cell changes pushed by the server. Wire format
+	// (from TOCLIENT_TERMINAL_DIFF):
+	//   repeated:  u16 cell_index, u8 cell_size, u8[cell_size] cell_bytes
+	// Cells with an unknown / mismatched cell_size are skipped.
+	void applyServerDiff(const std::string &cell_data);
+
 	// Snapshot / restore full terminal state (used to survive formspec regeneration)
 	struct TerminalState {
 		std::vector<TermCell> cells;

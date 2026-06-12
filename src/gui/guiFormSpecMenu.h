@@ -278,6 +278,10 @@ public:
 
 	GUITable* getTable(const std::string &tablename);
 	void updateTerminalData(const std::string &element_name, const std::string &data);
+	void initTerminalBuffer(const std::string &element_name, u8 type,
+		u16 cols, u16 rows, u32 version, const std::string &cell_data);
+	void applyTerminalDiff(const std::string &element_name,
+		u32 from_version, u32 to_version, const std::string &cell_data);
 	std::vector<std::string>* getDropDownValues(const std::string &name);
 
 	// This will only return a meaningful value if called after drawMenu().

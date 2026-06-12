@@ -5330,7 +5330,8 @@ double GUIFormSpecMenu::calculateImgsize(const parserData &data)
 	return std::min(prefer_imgsize, std::min(fitx_imgsize, fity_imgsize));
 }
 
-// terminal[x,y;w,h;name;cols;rows]
+// terminal[x,y;w,h;name;cols,rows;type]
+// type: "vt100" (default), "raw", "raw_color"
 void GUIFormSpecMenu::parseTerminal(parserData *data, const std::string &element)
 {
 	MY_CHECKCLIENT("terminal");
@@ -5342,14 +5343,28 @@ void GUIFormSpecMenu::parseTerminal(parserData *data, const std::string &element
 	}
 
 	std::vector<std::string> parts;
-	if (!precheckElement("terminal", element, 5, 5, parts))
+	if (!precheckElement("terminal", element, 5, 6, parts))
 		return;
 
 	std::vector<std::string> v_pos  = split(parts[0], ',');
 	std::vector<std::string> v_geom = split(parts[1], ',');
 	std::string name = unescape_string(parts[2]);
-	u32 cols = (u32)std::max(1, std::atoi(parts[3].c_str()));
-	u32 rows = (u32)std::max(1, std::atoi(parts[4].c_str()));
+	u32 cols, rows;
+	if (parts.size() >= 6) {
+		// New grammar: parts[3] = "cols,rows" (one field), parts[5] = type
+		auto v_dims = split(parts[3], ',');
+		if (v_dims.size() < 2) {
+			errorstream << "Invalid terminal[] dimensions: \""
+				<< parts[3] << "\"" << std::endl;
+			return;
+		}
+		cols = (u32)std::max(1, std::atoi(v_dims[0].c_str()));
+		rows = (u32)std::max(1, std::atoi(v_dims[1].c_str()));
+	} else {
+		// Legacy grammar: parts[3] = cols, parts[4] = rows
+		cols = (u32)std::max(1, std::atoi(parts[3].c_str()));
+		rows = (u32)std::max(1, std::atoi(parts[4].c_str()));
+	}
 
 	MY_CHECKPOS("terminal", 0);
 	MY_CHECKGEOM("terminal", 1);
@@ -5399,6 +5414,33 @@ void GUIFormSpecMenu::updateTerminalData(const std::string &element_name,
 	for (auto &pair : m_terminals) {
 		if (pair.first == element_name) {
 			pair.second->feed(data);
+			return;
+		}
+	}
+}
+
+void GUIFormSpecMenu::initTerminalBuffer(const std::string &element_name,
+	u8 type, u16 cols, u16 rows, u32 version, const std::string &cell_data)
+{
+	for (auto &pair : m_terminals) {
+		if (pair.first == element_name) {
+			pair.second->initFromServer(type, cols, rows, cell_data);
+			return;
+		}
+	}
+}
+
+void GUIFormSpecMenu::applyTerminalDiff(const std::string &element_name,
+	u32 from_version, u32 to_version, const std::string &cell_data)
+{
+	// For now we trust the server's version numbers. A future improvement
+	// could re-request a full INIT if from_version doesn't match the last
+	// version we applied.
+	(void)from_version;
+	(void)to_version;
+	for (auto &pair : m_terminals) {
+		if (pair.first == element_name) {
+			pair.second->applyServerDiff(cell_data);
 			return;
 		}
 	}

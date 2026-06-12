@@ -56,6 +56,13 @@ private:
 	static int l_show_formspec(lua_State *L);
 	static int l_send_terminal_data(lua_State *L);
 
+	// terminal_set_cell(formname, element_name, col, row, char [, fg, bg])
+	static int l_terminal_set_cell(lua_State *L);
+	// terminal_clear(formname, element_name)
+	static int l_terminal_clear(lua_State *L);
+	// terminal_get_size(formname, element_name) -> cols, rows or nil
+	static int l_terminal_get_size(lua_State *L);
+
 	// sound_play(spec, parameters)
 	static int l_sound_play(lua_State *L);
 

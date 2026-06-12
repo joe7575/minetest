@@ -423,6 +423,55 @@ int ModApiServer::l_send_terminal_data(lua_State *L)
 	return 1;
 }
 
+// terminal_set_cell(formname, element_name, col, row, char [, fg, bg])
+int ModApiServer::l_terminal_set_cell(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	Server *server = getServer(L);
+	const char *formname     = luaL_checkstring(L, 1);
+	const char *element_name = luaL_checkstring(L, 2);
+	int col = (int)luaL_checknumber(L, 3);
+	int row = (int)luaL_checknumber(L, 4);
+	size_t char_len;
+	const char *char_str     = luaL_checklstring(L, 5, &char_len);
+	int fg = (int)luaL_optnumber(L, 6, 7);
+	int bg = (int)luaL_optnumber(L, 7, 0);
+	if (col < 0 || col > 0xffff || row < 0 || row > 0xffff) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+	lua_pushboolean(L, server->terminalSetCell(formname, element_name,
+		(u16)col, (u16)row, std::string(char_str, char_len),
+		(u8)fg, (u8)bg));
+	return 1;
+}
+
+// terminal_clear(formname, element_name)
+int ModApiServer::l_terminal_clear(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	const char *formname     = luaL_checkstring(L, 1);
+	const char *element_name = luaL_checkstring(L, 2);
+	lua_pushboolean(L, getServer(L)->terminalClear(formname, element_name));
+	return 1;
+}
+
+// terminal_get_size(formname, element_name) -> cols, rows or nil
+int ModApiServer::l_terminal_get_size(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	const char *formname     = luaL_checkstring(L, 1);
+	const char *element_name = luaL_checkstring(L, 2);
+	u16 cols = 0, rows = 0;
+	if (!getServer(L)->terminalGetSize(formname, element_name, cols, rows)) {
+		lua_pushnil(L);
+		return 1;
+	}
+	lua_pushinteger(L, cols);
+	lua_pushinteger(L, rows);
+	return 2;
+}
+
 // get_current_modname()
 int ModApiServer::l_get_current_modname(lua_State *L)
 {
@@ -715,6 +764,9 @@ void ModApiServer::Initialize(lua_State *L, int top)
 	API_FCT(chat_send_player);
 	API_FCT(show_formspec);
 	API_FCT(send_terminal_data);
+	API_FCT(terminal_set_cell);
+	API_FCT(terminal_clear);
+	API_FCT(terminal_get_size);
 	API_FCT(sound_play);
 	API_FCT(sound_stop);
 	API_FCT(sound_fade);

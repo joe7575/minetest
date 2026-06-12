@@ -14,6 +14,7 @@
 #include "util/basic_macros.h"
 #include "util/metricsbackend.h"
 #include "server/clientiface.h"
+#include "serverterminal.h"
 #include "threading/ordered_mutex.h"
 #include "translation.h"
 #include "sound_spec.h"
@@ -245,6 +246,17 @@ public:
 
 	void ProcessData(NetworkPacket *pkt);
 
+	// Server-side terminal buffer (raw / raw_color). Mods call
+	// terminal_set_cell/clear via the Lua API; the server flushes
+	// diffs to attached clients every ~200ms.
+	ServerTerminalStore m_terminal_buffers;
+	void flushTerminalBuffers(float dtime);
+
+	// Parse a formspec string for terminal[] elements and create or
+	// resize their server-side buffers. Called from showFormspec().
+	void scanFormspecForTerminals(const std::string &formspec,
+		const std::string &formname);
+
 	void Send(NetworkPacket *pkt);
 	void Send(session_t peer_id, NetworkPacket *pkt);
 
@@ -369,6 +381,14 @@ public:
 	bool showFormspec(const char *name, const std::string &formspec, const std::string &formname);
 	bool sendTerminalData(const char *playername, const std::string &formname,
 			const std::string &element_name, const std::string &data);
+	// Server-side terminal[] cell manipulation (raw / raw_color only).
+	bool terminalSetCell(const std::string &formname,
+		const std::string &element_name, u16 col, u16 row,
+		const std::string &char_str, u8 fg, u8 bg);
+	bool terminalClear(const std::string &formname,
+		const std::string &element_name);
+	bool terminalGetSize(const std::string &formname,
+		const std::string &element_name, u16 &cols, u16 &rows) const;
 	Map &getMap();
 	ServerEnvironment & getEnv() { return *m_env; }
 	v3f findSpawnPos();
@@ -555,6 +575,11 @@ private:
 		const std::string &formname);
 	void SendTerminalData(session_t peer_id, const std::string &formname,
 		const std::string &element_name, const std::string &data);
+	void SendTerminalInit(session_t peer_id, const std::string &formname,
+		const std::string &element_name, const ServerTerminalBuffer &buf);
+	void SendTerminalDiff(session_t peer_id, const std::string &formname,
+		const std::string &element_name, const ServerTerminalBuffer &buf,
+		u32 from_version, const std::string &payload);
 	void SendHUDAdd(session_t peer_id, u32 id, HudElement *form);
 	void SendHUDRemove(session_t peer_id, u32 id);
 	void SendHUDChange(session_t peer_id, u32 id, HudElementStat stat, void *value);
@@ -695,6 +720,7 @@ private:
 	float m_masterserver_timer = 0.0f;
 	float m_emergethread_trigger_timer = 0.0f;
 	float m_savemap_timer = 0.0f;
+	float m_terminal_send_timer = 0.0f;
 	IntervalLimiter m_map_timer_and_unload_interval;
 	IntervalLimiter m_max_lag_decrease;
 

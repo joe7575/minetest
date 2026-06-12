@@ -591,3 +591,27 @@ void GameFormSpec::updateTerminalData(const std::string &formname,
 		return;
 	m_formspec->updateTerminalData(element_name, data);
 }
+
+void GameFormSpec::initTerminalBuffer(const std::string &formname,
+	const std::string &element_name, u8 type, u16 cols, u16 rows,
+	u32 version, const std::string &cell_data)
+{
+	if (!m_formspec)
+		return;
+	if (m_formspec->getName() != formname)
+		return;
+	m_formspec->initTerminalBuffer(element_name, type, cols, rows,
+		version, cell_data);
+}
+
+void GameFormSpec::applyTerminalDiff(const std::string &formname,
+	const std::string &element_name, u32 from_version, u32 to_version,
+	const std::string &cell_data)
+{
+	if (!m_formspec)
+		return;
+	if (m_formspec->getName() != formname)
+		return;
+	m_formspec->applyTerminalDiff(element_name, from_version, to_version,
+		cell_data);
+}

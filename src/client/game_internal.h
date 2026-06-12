@@ -278,6 +278,8 @@ private:
 	void handleClientEvent_CloudParams(ClientEvent *event, CameraOrientation *cam);
 	void handleClientEvent_UpdateCamera(ClientEvent *event, CameraOrientation *cam);
 	void handleClientEvent_TerminalData(ClientEvent *event, CameraOrientation *cam);
+	void handleClientEvent_TerminalInit(ClientEvent *event, CameraOrientation *cam);
+	void handleClientEvent_TerminalDiff(ClientEvent *event, CameraOrientation *cam);
 
 	void updateChat(f32 dtime);
 
