@@ -282,6 +282,14 @@ public:
 		u16 cols, u16 rows, u32 version, const std::string &cell_data);
 	void applyTerminalDiff(const std::string &element_name,
 		u32 from_version, u32 to_version, const std::string &cell_data);
+
+	// Return the formname this menu was opened with (i.e. the second
+	// argument to show_formspec). Note: IGUIElement::getName() returns
+	// the Irrlicht widget name, which is *not* the same thing.
+	std::string getFormName() const
+	{
+		return m_text_dst ? m_text_dst->m_formname : std::string();
+	}
 	std::vector<std::string>* getDropDownValues(const std::string &name);
 
 	// This will only return a meaningful value if called after drawMenu().

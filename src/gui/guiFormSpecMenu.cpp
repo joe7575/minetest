@@ -5349,22 +5349,11 @@ void GUIFormSpecMenu::parseTerminal(parserData *data, const std::string &element
 	std::vector<std::string> v_pos  = split(parts[0], ',');
 	std::vector<std::string> v_geom = split(parts[1], ',');
 	std::string name = unescape_string(parts[2]);
-	u32 cols, rows;
-	if (parts.size() >= 6) {
-		// New grammar: parts[3] = "cols,rows" (one field), parts[5] = type
-		auto v_dims = split(parts[3], ',');
-		if (v_dims.size() < 2) {
-			errorstream << "Invalid terminal[] dimensions: \""
-				<< parts[3] << "\"" << std::endl;
-			return;
-		}
-		cols = (u32)std::max(1, std::atoi(v_dims[0].c_str()));
-		rows = (u32)std::max(1, std::atoi(v_dims[1].c_str()));
-	} else {
-		// Legacy grammar: parts[3] = cols, parts[4] = rows
-		cols = (u32)std::max(1, std::atoi(parts[3].c_str()));
-		rows = (u32)std::max(1, std::atoi(parts[4].c_str()));
-	}
+	// Grammar: terminal[X,Y; W,H; name; cols; rows; type?]
+	// cols and rows are always separate fields; the optional 6th field
+	// selects the terminal type (default "vt100").
+	u32 cols = (u32)std::max(1, std::atoi(parts[3].c_str()));
+	u32 rows = (u32)std::max(1, std::atoi(parts[4].c_str()));
 
 	MY_CHECKPOS("terminal", 0);
 	MY_CHECKGEOM("terminal", 1);

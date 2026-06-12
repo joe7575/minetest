@@ -3693,20 +3693,16 @@ void Server::scanFormspecForTerminals(const std::string &formspec,
 		std::string name = unescape_string(parts[2]);
 		int cols, rows;
 		TerminalType type = TERMINAL_TYPE_VT100;
+		// Grammar: terminal[X,Y;W,H;name;cols;rows;type]
+		// `type` is optional (defaults to vt100). cols and rows are
+		// always separate fields for the scan path; the comma-merged
+		// "cols,rows" form is only handled by the client parser.
+		cols = std::atoi(std::string(trim(parts[3])).c_str());
+		rows = std::atoi(std::string(trim(parts[4])).c_str());
 		if (parts.size() >= 6) {
-			// New grammar: parts[3] = "cols,rows", parts[5] = type
-			auto dim_parts = split(parts[3], ',');
-			if (dim_parts.size() < 2)
-				continue;
-			cols = std::atoi(std::string(trim(dim_parts[0])).c_str());
-			rows = std::atoi(std::string(trim(dim_parts[1])).c_str());
 			std::string t(trim(parts[5]));
 			if (t == "raw")            type = TERMINAL_TYPE_RAW;
 			else if (t == "raw_color") type = TERMINAL_TYPE_RAW_COLOR;
-		} else {
-			// Legacy grammar: parts[3] = cols, parts[4] = rows, no type
-			cols = std::atoi(std::string(trim(parts[3])).c_str());
-			rows = std::atoi(std::string(trim(parts[4])).c_str());
 		}
 		if (cols <= 0 || rows <= 0)
 			continue;
