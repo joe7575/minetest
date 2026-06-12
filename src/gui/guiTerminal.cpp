@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cstring>
 #include "client/fontengine.h"
+#include "util/serialize.h"
 #include "log.h"
 
 // Standard VT100/ANSI 8-color palette (dark variants)
@@ -101,8 +102,9 @@ void GUITerminal::initFromServer(u8 type, u16 cols, u16 rows,
 	for (u32 i = 0; i < cell_count; i++) {
 		const u8 *p = reinterpret_cast<const u8*>(
 			cell_data.data() + i * cell_size);
-		u32 cp = (u32)p[0] | ((u32)p[1] << 8)
-			| ((u32)p[2] << 16) | ((u32)p[3] << 24);
+		// Cell wire format: u32 codepoint (big-endian, written via
+		// writeU32 in the server) followed by fg/bg bytes for raw_color.
+		u32 cp = readU32(p);
 		auto &c = m_cells[i];
 		c.ch = (wchar_t)cp;
 		c.attr = TermAttr{};
@@ -126,7 +128,7 @@ void GUITerminal::applyServerDiff(const std::string &cell_data)
 	u32 i = 0;
 	while (i + 3 <= cell_data.size()) {
 		const u8 *p = reinterpret_cast<const u8*>(cell_data.data() + i);
-		u16 idx = (u16)p[0] | ((u16)p[1] << 8);
+		u16 idx = readU16(p);
 		u8  cell_size = p[2];
 		i += 3;
 		if (i + cell_size > cell_data.size())
@@ -137,8 +139,7 @@ void GUITerminal::applyServerDiff(const std::string &cell_data)
 		}
 		auto &c = m_cells[idx];
 		const u8 *q = reinterpret_cast<const u8*>(cell_data.data() + i);
-		u32 cp = (u32)q[0] | ((u32)q[1] << 8)
-			| ((u32)q[2] << 16) | ((u32)q[3] << 24);
+		u32 cp = readU32(q);
 		c.ch = (wchar_t)cp;
 		if (cell_size >= 6) {
 			c.attr.fg = q[4];
