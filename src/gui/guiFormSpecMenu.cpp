@@ -5335,6 +5335,12 @@ void GUIFormSpecMenu::parseTerminal(parserData *data, const std::string &element
 {
 	MY_CHECKCLIENT("terminal");
 
+	if (m_formspec_version < FORMSPEC_API_VERSION) {
+		warningstream << "terminal[] requires formspec_version["
+			<< FORMSPEC_API_VERSION << "] or higher" << std::endl;
+		return;
+	}
+
 	std::vector<std::string> parts;
 	if (!precheckElement("terminal", element, 5, 5, parts))
 		return;

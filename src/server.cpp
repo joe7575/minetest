@@ -3538,6 +3538,12 @@ bool Server::sendTerminalData(const char *playername, const std::string &formnam
 	RemotePlayer *player = m_env->getPlayer(playername);
 	if (!player)
 		return false;
+	if (data.size() > TERMINAL_MAX_DATA_LEN) {
+		warningstream << "sendTerminalData: data of size " << data.size()
+			<< " exceeds TERMINAL_MAX_DATA_LEN (" << TERMINAL_MAX_DATA_LEN
+			<< "), dropping" << std::endl;
+		return false;
+	}
 	SendTerminalData(player->getPeerId(), formname, element_name, data);
 	return true;
 }

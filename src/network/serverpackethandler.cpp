@@ -1840,17 +1840,17 @@ void Server::handleCommand_UpdateClientInfo(NetworkPacket *pkt)
 }
 void Server::handleCommand_TerminalKey(NetworkPacket *pkt)
 {
-        session_t peer_id = pkt->getPeerId();
-        RemotePlayer *player = m_env->getPlayer(peer_id);
-        if (!player)
-                return;
-        PlayerSAO *playersao = player->getPlayerSAO();
-        if (!playersao)
-                return;
+	session_t peer_id = pkt->getPeerId();
+	RemotePlayer *player = m_env->getPlayer(peer_id);
+	if (!player)
+		return;
+	PlayerSAO *playersao = player->getPlayerSAO();
+	if (!playersao)
+		return;
 
-        std::string formname, element_name, data;
-        *pkt >> formname >> element_name;
-        data = pkt->readLongString();
+	std::string formname, element_name, data;
+	*pkt >> formname >> element_name;
+	data = pkt->readLongString();
 
-        getScriptIface()->on_terminal_key(playersao, formname, element_name, data);
+	getScriptIface()->on_terminal_key(playersao, formname, element_name, data);
 }

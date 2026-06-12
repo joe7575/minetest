@@ -1923,6 +1923,13 @@ void Client::handleCommand_TerminalData(NetworkPacket *pkt)
 	*pkt >> formname >> element_name;
 	data = pkt->readLongString();
 
+	if (data.size() > TERMINAL_MAX_DATA_LEN) {
+		warningstream << "Client: received TOCLIENT_TERMINAL_DATA of size "
+			<< data.size() << " exceeds TERMINAL_MAX_DATA_LEN ("
+			<< TERMINAL_MAX_DATA_LEN << "), dropping" << std::endl;
+		return;
+	}
+
 	ClientEvent *event = new ClientEvent(CE_TERMINAL_DATA);
 	event->terminal_data.formname     = new std::string(formname);
 	event->terminal_data.element_name = new std::string(element_name);

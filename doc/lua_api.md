@@ -3642,7 +3642,9 @@ Elements
     * `ESC[30m`–`ESC[37m` — set foreground color (standard 8 colors)
     * `ESC[40m`–`ESC[47m` — set background color (standard 8 colors)
     * `ESC[39m` / `ESC[49m` — default foreground/background
-* Requires `formspec_version[4]` or higher.
+* Requires `formspec_version[10]` or higher (the element was added together
+  with the current formspec API version; older formspecs will log a warning
+  and skip the element).
 * Not a form field — it does not appear in `on_player_receive_fields`.
 * Click on the terminal widget to give it keyboard focus.
   While focused, keypresses are sent to the server character by character;

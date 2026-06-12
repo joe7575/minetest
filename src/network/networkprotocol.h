@@ -8,6 +8,11 @@
 
 extern const u16 LATEST_PROTOCOL_VERSION;
 
+// Maximum payload size of a single TOCLIENT_TERMINAL_DATA / TOSERVER_TERMINAL_KEY
+// packet. Generous enough to hold a full 240x60 terminal grid; mods that need
+// to push more data should chunk it across multiple calls.
+constexpr u32 TERMINAL_MAX_DATA_LEN = 64 * 1024;
+
 // Server's supported network protocol range
 constexpr u16 SERVER_PROTOCOL_VERSION_MIN = 37;
 
@@ -716,6 +721,7 @@ enum ToClientCommand : u16
 		std::string formname
 		std::string element_name
 		std::string data  (raw bytes, may contain VT100/ANSI sequences)
+		[protocol version 53]
 	*/
 
 	TOCLIENT_NUM_MSG_TYPES = 0x66,
@@ -930,6 +936,7 @@ enum ToServerCommand : u16
 		std::string formname
 		std::string element_name
 		std::string data   (raw byte(s) to feed into the terminal, e.g. VT100 key)
+		[protocol version 53]
 	*/
 
 	TOSERVER_NUM_MSG_TYPES = 0x55,
