@@ -44,9 +44,15 @@ void GUITerminal::setOverrideFont(gui::IGUIFont *font)
 	m_font = font;
 }
 
+void GUITerminal::setFontSizeOverride(u32 font_size)
+{
+	m_font_size_override = font_size;
+	m_font = nullptr; // force draw() to look up a new font on next frame
+}
+
 GUITerminal::TerminalState GUITerminal::saveState() const
 {
-	return { m_cells, m_cur_col, m_cur_row, m_cur_attr };
+	return { m_cells, m_cur_col, m_cur_row, m_cur_attr, m_font_size_override };
 }
 
 void GUITerminal::restoreState(const TerminalState &s)
@@ -57,6 +63,11 @@ void GUITerminal::restoreState(const TerminalState &s)
 	m_cur_col  = std::min(s.cur_col, m_cols - 1);
 	m_cur_row  = std::min(s.cur_row, m_rows - 1);
 	m_cur_attr = s.cur_attr;
+	// Font size survives formspec regeneration so the +/- zoom buttons
+	// behave like a persistent preference within a session.
+	m_font_size_override = s.font_size;
+	if (m_font_size_override != 0)
+		m_font = nullptr; // force re-lookup at the new size
 }
 
 void GUITerminal::reset()
@@ -385,10 +396,19 @@ void GUITerminal::draw()
 	video::IVideoDriver *driver = Environment->getVideoDriver();
 	gui::IGUISkin *skin = Environment->getSkin();
 
-	// Prefer an explicit override font, then Luanti's built-in mono font
-	gui::IGUIFont *font = m_font
-		? m_font
-		: g_fontengine->getFont(FONT_SIZE_UNSPECIFIED, FM_Mono);
+	// Font selection order:
+	//   1. An explicit setOverrideFont() (rare, used for style overrides).
+	//   2. A per-element font-size override (set via setFontSizeOverride),
+	//      used by mods to implement +/- zoom buttons.
+	//   3. Luanti's built-in mono font at the default size, driven by the
+	//      global font_size setting.
+	gui::IGUIFont *font = m_font;
+	if (!font) {
+		if (m_font_size_override > 0)
+			font = g_fontengine->getFont(m_font_size_override, FM_Mono);
+		else
+			font = g_fontengine->getFont(FONT_SIZE_UNSPECIFIED, FM_Mono);
+	}
 
 	if (!font) font = skin->getFont(gui::EGDF_DEFAULT);
 	if (!font) return;

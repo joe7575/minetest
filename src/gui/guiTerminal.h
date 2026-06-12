@@ -104,6 +104,7 @@ public:
 		std::vector<TermCell> cells;
 		u32 cur_col, cur_row;
 		TermAttr cur_attr;
+		u32 font_size = 0;  // 0 = use the global default font size
 	};
 	TerminalState saveState() const;
 	void restoreState(const TerminalState &s);
@@ -118,6 +119,13 @@ public:
 
 	void setOverrideFont(gui::IGUIFont *font);
 
+	// Set an explicit font size in pixels. 0 means "use the default size
+	// from the global font_size setting". A non-zero override forces a
+	// specific monospace font, which the form can use to implement
+	// +/- zoom buttons.
+	void setFontSizeOverride(u32 font_size);
+	u32 getFontSizeOverride() const { return m_font_size_override; }
+
 private:
 	std::function<void(const std::string &)> m_input_callback;
 	u32 m_cols;
@@ -129,6 +137,7 @@ private:
 	std::vector<TermCell> m_cells; // row-major: index = row*cols + col
 
 	gui::IGUIFont *m_font = nullptr;
+	u32 m_font_size_override = 0; // 0 = use the global font size
 
 	// VT100 parser state machine
 	enum class ParseState {

@@ -5378,6 +5378,25 @@ void GUIFormSpecMenu::parseTerminal(parserData *data, const std::string &element
 	auto *term = new GUITerminal(Environment, this, spec.fid, rect, cols, rows);
 	term->setNotClipped(true);
 
+	// If a style was set for this element, pick up an explicit font_size
+	// override. The form can then implement +/- zoom buttons by changing
+	// the style and re-showing the form.
+	auto style = getDefaultStyleForElement("terminal", spec.fname);
+	if (style.isNotDefault(StyleSpec::FONT_SIZE)) {
+		const std::string &size = style.get(StyleSpec::FONT_SIZE, std::string());
+		if (!size.empty()) {
+			int calc_size = 1;
+			if (size[0] == '*') {
+				calc_size = stof(size.substr(1)) * g_fontengine->getFontSize(FM_Mono);
+			} else if (size[0] == '+' || size[0] == '-') {
+				calc_size = stoi(size) + g_fontengine->getFontSize(FM_Mono);
+			} else {
+				calc_size = stoi(size);
+			}
+			term->setFontSizeOverride(std::min(std::max(calc_size, 1), 999));
+		}
+	}
+
 	// Set input callback: sends terminal key events to the server.
 	{
 		std::string formname = m_text_dst->m_formname;
