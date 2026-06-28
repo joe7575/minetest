@@ -2561,6 +2561,28 @@ void Server::sendMetadataChanged(const std::unordered_set<v3s16> &positions, flo
 
 			// Add the change to send list
 			meta_updates_list.set(pos, meta);
+
+			// NodeMeta formspecs are pushed to the client through this
+			// path, but unlike Server::showFormspec() they don't go
+			// through scanFormspecForTerminals() automatically.  Wire
+			// that up here so raw/raw_color terminal[] buffers declared
+			// in a NodeMeta formspec are created (or resized) on the
+			// server side, and so the peer's formspec state is
+			// remembered for flushTerminalBuffers().
+			//
+			// The "formname" we use here is intentionally positional
+			// (nodemeta@<x>,<y>,<z>) so each node has its own server-side
+			// buffer store.  Mods that need a shared buffer (one formname
+			// across many nodes) can still call minetest.terminal_set_cell
+			// with a constant formname and pre-create the matching buffer
+			// via core.show_formspec or by emitting a sentinel form on
+			// join.
+			const std::string &fs = meta->getString("formspec");
+			if (!fs.empty()) {
+				std::string formname = "nodemeta@" + itos(pos.X) + ","
+					+ itos(pos.Y) + "," + itos(pos.Z);
+				scanFormspecForTerminals(fs, formname);
+			}
 		}
 		if (meta_updates_list.size() == 0)
 			continue;
@@ -3656,17 +3678,25 @@ void Server::scanFormspecForTerminals(const std::string &formspec,
 		if (pos >= formspec.size())
 			break;
 
-		// Match "terminal[" prefix (case-sensitive, matches the parser)
-		static const std::string prefix = "terminal[";
-		if (formspec.compare(pos, prefix.size(), prefix) != 0) {
-			// Not a terminal element; skip to the next ']' (best effort)
+		// Match "terminal[" or "screen[" prefix. "screen" is the
+		// preferred name; "terminal" is kept as a deprecated alias
+		// for backwards compatibility.
+		static const std::string prefix_terminal = "terminal[";
+		static const std::string prefix_screen = "screen[";
+		bool is_screen = false;
+		if (formspec.compare(pos, prefix_screen.size(), prefix_screen) == 0) {
+			is_screen = true;
+			pos += prefix_screen.size();
+		} else if (formspec.compare(pos, prefix_terminal.size(), prefix_terminal) == 0) {
+			pos += prefix_terminal.size();
+		} else {
+			// Not a terminal/screen element; skip to the next ']' (best effort)
 			auto close = formspec.find(']', pos);
 			if (close == std::string::npos)
 				break;
 			pos = close + 1;
 			continue;
 		}
-		pos += prefix.size();
 
 		// Parse until the matching ']'. Formspec args may contain '['
 		// (e.g. coordinates) but the top-level brackets balance; we
@@ -3743,13 +3773,17 @@ bool Server::terminalSetCell(const std::string &formname,
 {
 	ServerTerminalBuffer *buf = m_terminal_buffers.find(formname, element_name);
 	if (!buf) {
-		// Lazy-create with default 80x25 raw, so that simple mods work
-		// even before the first show_formspec has been processed. Most
-		// mods will trigger this implicitly via show_formspec; the
-		// fall-back keeps accidental "fire and forget" writes from
-		// silently being dropped.
-		buf = &m_terminal_buffers.getOrCreate(TERMINAL_TYPE_RAW, 80, 25,
-			formname, element_name);
+		// Fall-back: if the buffer hasn't been created yet, log a
+		// warning and drop the write. Mods that want guaranteed
+		// buffer creation should call core.terminal_scan_formspec()
+		// first (which goes through Server::scanFormspecForTerminals
+		// and creates a buffer with the right type and dimensions
+		// from the formspec they intend to attach to this buffer).
+		warningstream << "Server::terminalSetCell: no buffer for "
+			<< formname << "/" << element_name
+			<< " (call core.terminal_scan_formspec() first); dropping"
+			<< std::endl;
+		return false;
 	}
 	if (buf->getType() == TERMINAL_TYPE_VT100) {
 		warningstream << "Server::terminalSetCell: buffer for "
@@ -3810,6 +3844,12 @@ bool Server::terminalGetSize(const std::string &formname,
 	cols = buf->getCols();
 	rows = buf->getRows();
 	return true;
+}
+
+bool Server::terminalDestroy(const std::string &formname,
+	const std::string &element_name)
+{
+	return m_terminal_buffers.destroy(formname, element_name) > 0;
 }
 
 u32 Server::hudAdd(RemotePlayer *player, HudElement *form)

@@ -1186,9 +1186,49 @@ void Server::handleCommand_Interact(NetworkPacket *pkt)
 	case INTERACT_PLACE: {
 		std::optional<ItemStack> selected_item;
 		getWieldedItem(playersao, selected_item);
-
 		const bool had_prediction = !selected_item->getDefinition(m_itemdef).
 			node_placement_prediction.empty();
+
+		// If the player just right-clicked a node (i.e. NOT a
+		// place-item action) and the node has a NodeMeta formspec, the
+		// client is about to open that form.  Bind the peer's
+		// formspec_state to the per-position "nodemeta@<x>,<y>,<z>"
+		// formname up front so that the very next flushTerminalBuffers
+		// tick can deliver an INIT for it; the lazy create-in-on_rightclick
+		// path in the mod (which calls terminal_scan_formspec() and then
+		// terminal_set_cell()) only becomes visible to the flush loop
+		// after it sets m_dirty_indices, but the state must be in place
+		// before any DIFF is queued.
+		//
+		// Distinguishing a place-item action from a right-click on an
+		// existing node is unfortunately tricky: both come through
+		// INTERACT_PLACE, and the held item always has a placement
+		// prediction when a block is in the hand, even if the player
+		// just wants to open the form.
+		//
+		// PointedThing semantics (see util/pointedthing.h):
+		//   - node_undersurface: the node whose nodebox was hit by the
+		//     ray (i.e. the actual clicked node).
+		//   - node_abovesurface: the node the ray passed through just
+		//     before hitting node_undersurface (= air above when
+		//     right-clicking the top face of a node, = air above the
+		//     to-be-placed block when placing an item on the ground).
+		//
+		// For a right-click on an existing terminal node, the
+		// node_undersurface is the terminal node itself, so checking
+		// NodeMeta there finds the formspec.  For a place-item action
+		// on the ground, node_undersurface is the *ground* node (not
+		// air) and has no terminal formspec, so no state is set.  This
+		// is exactly what we want.
+		if (pointed.type == POINTEDTHING_NODE) {
+			v3s16 p = pointed.node_undersurface;
+			NodeMetadata *nm = m_env->getMap().getNodeMetadata(p);
+			if (nm && !nm->getString("formspec").empty()) {
+				std::string formname = "nodemeta@" + itos(p.X) + ","
+					+ itos(p.Y) + "," + itos(p.Z);
+				m_formspec_state_data[peer_id] = formname;
+			}
+		}
 
 		if (pointed.type == POINTEDTHING_OBJECT) {
 			// Right click object

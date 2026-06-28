@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <deque>
 
 /*
  * Server-side terminal buffer model.
@@ -77,6 +78,15 @@ public:
 	// Reset all cells to default. Bumps the version.
 	void clear();
 
+	// Cursor state (used by the high-level write methods).
+	void setCursor(u16 x, u16 y) { m_cursor_x = x; m_cursor_y = y; }
+	u16 getCursorX() const { return m_cursor_x; }
+	u16 getCursorY() const { return m_cursor_y; }
+	// Write a cell at the current cursor position, then advance the
+	// cursor by one column (wrapping to the next row at the right
+	// edge). fg/bg apply to the current cell.
+	void setCursorCell(wchar_t ch, u8 fg = 7, u8 bg = 0);
+
 	// Serialize the entire grid into a contiguous byte buffer. Used for
 	// TOCLIENT_TERMINAL_INIT.
 	void serializeAll(std::string &out) const;
@@ -104,6 +114,23 @@ private:
 	// without having to walk the whole grid comparing against each
 	// peer's last-seen version.
 	std::vector<u16> m_dirty_indices;
+	// Cursor position for high-level write methods. 0-indexed.
+	// For "vt100" buffers this is also the visual cursor; for "raw"/
+	// "raw_color" buffers it is used by buf:write_char etc.
+	u16 m_cursor_x = 0;
+	u16 m_cursor_y = 0;
+	// Current fg/bg colors for high-level write methods.
+	u8 m_cur_fg = 7;
+	u8 m_cur_bg = 0;
+	// Per-buffer input queue (FIFO). Filled by client keystroke
+	// packets; drained by the per-buffer on_key Lua callback.
+	std::deque<u8> m_input_queue;
+	// Player who currently holds input focus (server-side state).
+	// Empty string means "no one has focus".
+	std::string m_focus_owner;
+	// Timestamp (ms since server start) at which focus was taken;
+	// used for idle timeout.
+	u32 m_focus_taken_at_ms = 0;
 };
 
 /*

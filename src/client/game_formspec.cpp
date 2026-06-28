@@ -31,6 +31,15 @@ struct TextDestNodeMetadata : public TextDest
 	{
 		m_p = p;
 		m_client = client;
+		// The server keys the ServerTerminalStore by a positional
+		// formname ("nodemeta@<x>,<y>,<z>") for NodeMeta formspecs --
+		// see Server::sendMetadataChanged.  Mirror that here so that
+		// GameFormSpec::initTerminalBuffer() / applyTerminalDiff() can
+		// match the formname coming in over the wire against the one
+		// the open form was opened with, and not silently drop the
+		// INIT/DIFF packets.
+		m_formname = "nodemeta@" + std::to_string(p.X) + ","
+			+ std::to_string(p.Y) + "," + std::to_string(p.Z);
 	}
 	void gotText(const StringMap &fields)
 	{

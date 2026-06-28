@@ -64,8 +64,13 @@ void GUITerminal::restoreState(const TerminalState &s)
 	m_cur_row  = std::min(s.cur_row, m_rows - 1);
 	m_cur_attr = s.cur_attr;
 	// Font size survives formspec regeneration so the +/- zoom buttons
-	// behave like a persistent preference within a session.
-	m_font_size_override = s.font_size;
+	// behave like a persistent preference within a session. However,
+	// parseTerminal() may have just set a fresh m_font_size_override
+	// from the formspec's style[...;font_size=N] directive; that wins
+	// because the user is explicitly requesting a new size via the
+	// regenerated form, not a session-persistent preference.
+	if (m_font_size_override == 0 && s.font_size != 0)
+		m_font_size_override = s.font_size;
 	if (m_font_size_override != 0)
 		m_font = nullptr; // force re-lookup at the new size
 }
@@ -414,10 +419,25 @@ void GUITerminal::draw()
 	if (!font) return;
 
 	// Determine cell size from font
-	// Use 'M' as the reference glyph for monospace width
+	// Use 'M' as the reference glyph for monospace width.
+	// We want square cells (cell_h == cell_w) for the typical
+	// C64-style monospace look, but cell_h must be at least as
+	// large as the font's line height + 2 Pixels of "small
+	// line spacing" so glyphs are not clipped.  For fonts
+	// where the line height is taller than the M-width (the
+	// typical case with proportional monospace like Cousine),
+	// we use the line height.  For fonts where the M-width
+	// dominates (square C64 fonts), we use cell_w + 2.  The
+	// max() of the two keeps the cell large enough for either.
+	// Note: this means cells are square (1:1) only when font
+	// dimensions are square.  The 2-Pixel "small line spacing"
+	// is what gives the appearance of a stretched 1:1 cell
+	// with a C64 font: cell_w=8, cell_h=10.  The user can
+	// reduce the font size until cell_h matches their
+	// expectation.
 	core::dimension2d<u32> char_dim = font->getDimension(L"M");
 	u32 cell_w = char_dim.Width;
-	u32 cell_h = char_dim.Height + 2; // small line spacing
+	u32 cell_h = std::max(cell_w, char_dim.Height + 2);
 
 	core::rect<s32> outer = AbsoluteRect;
 

@@ -1939,32 +1939,37 @@ void Client::handleCommand_TerminalData(NetworkPacket *pkt)
 
 void Client::handleCommand_TerminalInit(NetworkPacket *pkt)
 {
-	std::string formname, element_name;
-	*pkt >> formname >> element_name;
-	u8 type_u8 = 0;
-	u16 cols = 0, rows = 0;
-	u32 version = 0, cell_data_size = 0;
-	*pkt >> type_u8 >> cols >> rows >> version >> cell_data_size;
-	if (cell_data_size > TERMINAL_MAX_DATA_LEN) {
-		warningstream << "Client: received TOCLIENT_TERMINAL_INIT of size "
-			<< cell_data_size << " exceeds cap, dropping" << std::endl;
-		return;
-	}
-	if (pkt->getRemainingBytes() < cell_data_size) {
-		warningstream << "Client: TOCLIENT_TERMINAL_INIT truncated" << std::endl;
-		return;
-	}
-	std::string cell_data = pkt->readRawString(cell_data_size);
+	try {
+		std::string formname, element_name;
+		*pkt >> formname >> element_name;
+		u8 type_u8 = 0;
+		u16 cols = 0, rows = 0;
+		u32 version = 0, cell_data_size = 0;
+		*pkt >> type_u8 >> cols >> rows >> version >> cell_data_size;
+		if (cell_data_size > TERMINAL_MAX_DATA_LEN) {
+			warningstream << "Client: received TOCLIENT_TERMINAL_INIT of size "
+				<< cell_data_size << " exceeds cap, dropping" << std::endl;
+			return;
+		}
+		if (pkt->getRemainingBytes() < cell_data_size) {
+			warningstream << "Client: TOCLIENT_TERMINAL_INIT truncated" << std::endl;
+			return;
+		}
+		std::string cell_data = pkt->readRawString(cell_data_size);
 
-	ClientEvent *event = new ClientEvent(CE_TERMINAL_INIT);
-	event->terminal_init.formname     = new std::string(formname);
-	event->terminal_init.element_name = new std::string(element_name);
-	event->terminal_init.type         = type_u8;
-	event->terminal_init.cols         = cols;
-	event->terminal_init.rows         = rows;
-	event->terminal_init.version      = version;
-	event->terminal_init.cell_data    = new std::string(std::move(cell_data));
-	m_client_event_queue.push(event);
+		ClientEvent *event = new ClientEvent(CE_TERMINAL_INIT);
+		event->terminal_init.formname     = new std::string(formname);
+		event->terminal_init.element_name = new std::string(element_name);
+		event->terminal_init.type         = type_u8;
+		event->terminal_init.cols         = cols;
+		event->terminal_init.rows         = rows;
+		event->terminal_init.version      = version;
+		event->terminal_init.cell_data    = new std::string(std::move(cell_data));
+		m_client_event_queue.push(event);
+	} catch (const std::exception &e) {
+		warningstream << "Client::handleCommand_TerminalInit EXCEPTION: "
+			<< e.what() << std::endl;
+	}
 }
 
 void Client::handleCommand_TerminalDiff(NetworkPacket *pkt)

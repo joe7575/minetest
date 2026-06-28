@@ -389,6 +389,17 @@ public:
 		const std::string &element_name);
 	bool terminalGetSize(const std::string &formname,
 		const std::string &element_name, u16 &cols, u16 &rows) const;
+	bool terminalDestroy(const std::string &formname,
+		const std::string &element_name);
+	// Direct access for ScreenBuffer Lua class.
+	ServerTerminalBuffer *terminalFind(const std::string &formname,
+		const std::string &element_name) {
+		return m_terminal_buffers.find(formname, element_name);
+	}
+	ServerTerminalBuffer &terminalGetOrCreate(TerminalType type, u16 cols, u16 rows,
+		const std::string &formname, const std::string &element_name) {
+		return m_terminal_buffers.getOrCreate(type, cols, rows, formname, element_name);
+	}
 	Map &getMap();
 	ServerEnvironment & getEnv() { return *m_env; }
 	v3f findSpawnPos();

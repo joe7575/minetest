@@ -5,9 +5,39 @@
 #pragma once
 
 #include "lua_api/l_base.h"
+#include "serverterminal.h"
 
 class ModApiServer : public ModApiBase
 {
+public:
+	// The ScreenBuffer methods must be public so that the
+	// C-function trampolines in l_server.cpp can forward to
+	// them.  Otherwise the compiler complains that the static
+	// member is private.
+	static int l_screenbuffer_get_pos(lua_State *L);
+	static int l_screenbuffer_get_element_name(lua_State *L);
+	static int l_screenbuffer_get_formname(lua_State *L);
+	static int l_screenbuffer_get_type(lua_State *L);
+	static int l_screenbuffer_get_cols(lua_State *L);
+	static int l_screenbuffer_get_rows(lua_State *L);
+	static int l_screenbuffer_get_size(lua_State *L);
+	static int l_screenbuffer_get_version(lua_State *L);
+	static int l_screenbuffer_is_valid(lua_State *L);
+	static int l_screenbuffer_set_cell(lua_State *L);
+	static int l_screenbuffer_get_cell(lua_State *L);
+	static int l_screenbuffer_clear(lua_State *L);
+	static int l_screenbuffer_set_cursor(lua_State *L);
+	static int l_screenbuffer_get_cursor(lua_State *L);
+	static int l_screenbuffer_write_char(lua_State *L);
+	static int l_screenbuffer_write_string(lua_State *L);
+	static int l_screenbuffer_write_line(lua_State *L);
+	static int l_screenbuffer_fill_rect(lua_State *L);
+	static int l_screenbuffer_draw_box(lua_State *L);
+	static int l_screenbuffer_scroll(lua_State *L);
+	static int l_screenbuffer_serialize(lua_State *L);
+	static int l_screenbuffer_deserialize(lua_State *L);
+	static int l_screenbuffer_tostring(lua_State *L);
+	static int l_screenbuffer_base64_encode(lua_State *L);
 private:
 	// request_shutdown([message], [reconnect])
 	static int l_request_shutdown(lua_State *L);
@@ -54,14 +84,11 @@ private:
 
 	// show_formspec(playername,formname,formspec)
 	static int l_show_formspec(lua_State *L);
-	static int l_send_terminal_data(lua_State *L);
 
-	// terminal_set_cell(formname, element_name, col, row, char [, fg, bg])
-	static int l_terminal_set_cell(lua_State *L);
-	// terminal_clear(formname, element_name)
-	static int l_terminal_clear(lua_State *L);
-	// terminal_get_size(formname, element_name) -> cols, rows or nil
-	static int l_terminal_get_size(lua_State *L);
+	// ScreenBuffer constructor.  (Other ScreenBuffer methods
+	// are declared in the public: section above so the C-function
+	// trampolines in l_server.cpp can call them.)
+	static int l_create_screenbuffer(lua_State *L);
 
 	// sound_play(spec, parameters)
 	static int l_sound_play(lua_State *L);

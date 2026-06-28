@@ -75,6 +75,24 @@ void ServerTerminalBuffer::clear()
 	bumpVersion();
 }
 
+void ServerTerminalBuffer::setCursorCell(wchar_t ch, u8 fg, u8 bg)
+{
+	if (m_cursor_x >= m_cols || m_cursor_y >= m_rows) {
+		// Out of range; do nothing.
+		return;
+	}
+	setCell(m_cursor_x, m_cursor_y, ch, fg, bg);
+	// Advance the cursor; wrap at the right edge.
+	m_cursor_x++;
+	if (m_cursor_x >= m_cols) {
+		m_cursor_x = 0;
+		m_cursor_y++;
+		if (m_cursor_y >= m_rows) {
+			m_cursor_y = m_rows - 1;
+		}
+	}
+}
+
 void ServerTerminalBuffer::serializeAll(std::string &out) const
 {
 	u8 cell_size = getCellWireSize();

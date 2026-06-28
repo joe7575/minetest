@@ -2951,6 +2951,8 @@ const std::unordered_map<std::string, std::function<void(GUIFormSpecMenu*, GUIFo
 		{"model",                  &GUIFormSpecMenu::parseModel},
 		{"allow_close",            &GUIFormSpecMenu::parseAllowClose},
 		{"terminal",               &GUIFormSpecMenu::parseTerminal},
+		// New: `screen` is the preferred name; `terminal` is kept as alias.
+		{"screen",                 &GUIFormSpecMenu::parseTerminal},
 };
 
 
